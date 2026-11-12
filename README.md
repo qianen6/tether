@@ -44,7 +44,7 @@ scripts/fetch-vendor.sh            # 下载并校验 TailPocket 发布文件（v
 cargo test --workspace             # 电脑端测试
 pnpm -r test                       # SDK、电脑端界面、手机 App 的测试
 
-pnpm --filter desktop tauri build  # 电脑端安装包
+scripts/package-desktop.sh         # 电脑端安装包（程序里不带本机路径）
 ```
 
 手机 App 用 EAS 云构建，步骤见 [`apps/mobile-debug/README.md`](apps/mobile-debug/README.md)（先 `npx eas-cli init` 关联你自己的 Expo 项目）。
