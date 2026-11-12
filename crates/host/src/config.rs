@@ -163,6 +163,9 @@ pub(crate) fn find_helper() -> Option<PathBuf> {
     {
         dirs.push(dir);
     }
+    // The checkout it was built in: for development only, so a release does
+    // not carry the build machine's paths.
+    #[cfg(debug_assertions)]
     dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../vendor/tailpocket/bin"));
     if let Ok(cwd) = std::env::current_dir() {
         dirs.push(cwd.join("vendor/tailpocket/bin"));

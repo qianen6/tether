@@ -11,6 +11,11 @@
 
 > 名字是临时的。手机端目前是功能完整的调试 App（`apps/mobile-debug`）。
 
+## 下载
+
+到 [Releases](../../releases) 下载：Windows / macOS / Linux 的桌面版、命令行版（`tether serve`，适合服务器）和 Android App。
+安装包目前还没有代码签名，首次运行的提示和放行方法写在每个版本的说明里。
+
 ## 组成
 
 ```
@@ -48,6 +53,11 @@ scripts/package-desktop.sh         # 电脑端安装包（程序里不带本机�
 ```
 
 手机 App 用 EAS 云构建，步骤见 [`apps/mobile-debug/README.md`](apps/mobile-debug/README.md)（先 `npx eas-cli init` 关联你自己的 Expo 项目）。
+
+## 发布
+
+推送 `v*` 标签（如 `v0.1.0`）后，GitHub Actions 自动构建各平台安装包和命令行版，连同 `SHA256SUMS` 发布到 Releases（见 `.github/workflows/release.yml`）。
+可选设置：变量 `WINDOWS_SIGN_COMMAND` 为 Windows 程序签名；变量 `EXPO_OWNER`、`EAS_PROJECT_ID` 和密钥 `EXPO_TOKEN` 同时构建 Android App。
 
 ## 许可
 
