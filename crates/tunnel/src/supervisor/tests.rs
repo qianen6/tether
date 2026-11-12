@@ -28,11 +28,22 @@ struct MemoryProcess {
 
 impl Spawner for MemorySpawner {
     fn spawn(&mut self, _: &TunnelConfig) -> Result<Helper> {
-        if self
-            .failures
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
-            .is_ok()
-        {
+        // One failure used up per spawn while any are left (`fetch_update`,
+        // renamed in newer Rust, by hand).
+        let mut left = self.failures.load(Ordering::SeqCst);
+        let failed = loop {
+            let Some(next) = left.checked_sub(1) else {
+                break false;
+            };
+            match self
+                .failures
+                .compare_exchange(left, next, Ordering::SeqCst, Ordering::SeqCst)
+            {
+                Ok(_) => break true,
+                Err(now) => left = now,
+            }
+        };
+        if failed {
             bail!("simulated spawn failure");
         }
         let (a, b) = tokio::io::duplex(4096);
