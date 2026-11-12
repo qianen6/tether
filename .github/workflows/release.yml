@@ -51,9 +51,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: TailPocket helper
+      # Also the phone packages pnpm installs from vendor/.
+      - name: TailPocket files
         run: scripts/fetch-vendor.sh ${{ matrix.vendor }}
+      - run: pnpm install --frozen-lockfile
 
       - name: Signing
         if: runner.os == 'Windows' && vars.WINDOWS_SIGN_COMMAND != ''
@@ -106,6 +107,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - run: scripts/fetch-vendor.sh mobile
       - run: pnpm install --frozen-lockfile
       - name: Link the Expo project
         working-directory: apps/mobile-debug
