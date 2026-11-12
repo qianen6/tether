@@ -1,0 +1,18 @@
+[package]
+name = "tether-e2e"
+description = "End-to-end tests through a real TailPocket tunnel (manual, need network)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+tether-host.workspace = true
+tether-proto.workspace = true
+tether-tunnel.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+futures.workspace = true
+tokio-tungstenite.workspace = true
+tempfile.workspace = true

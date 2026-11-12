@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Tether 调试",
+    "slug": "tether-mobile-debug",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.tether.mobiledebug"
+    },
+    "android": {
+      "package": "dev.tether.mobiledebug",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 16
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "./plugins/with-tailpocket-maven",
+      "expo-font"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+[package]
+name = "tether-agent-api"
+description = "The interface every Tether agent adapter implements, plus test helpers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+uuid.workspace = true

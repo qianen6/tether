@@ -1,0 +1,21 @@
+[package]
+name = "tether-adapter-codex"
+description = "Codex adapter (codex app-server, JSON-RPC)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+tether-agent-api.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+which.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

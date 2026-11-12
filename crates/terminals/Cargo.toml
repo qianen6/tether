@@ -1,0 +1,19 @@
+[package]
+name = "tether-terminals"
+description = "PTY terminals (ConPTY on Windows)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+bytes.workspace = true
+portable-pty.workspace = true
+which.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

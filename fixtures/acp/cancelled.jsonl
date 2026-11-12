@@ -1,0 +1,2 @@
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call_update","toolCallId":"cancel-tool","title":"Final tool update","status":"failed","rawOutput":"cancelled"}}}
+{"jsonrpc":"2.0","id":3,"result":{"stopReason":"cancelled"}}

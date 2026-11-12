@@ -1,0 +1,6 @@
+{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}
+{"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"inProgress","error":null}}}
+{"method":"item/agentMessage/delta","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"answer-1","delta":"你好"}}
+{"method":"item/agentMessage/delta","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"answer-1","delta":"，Tether"}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":1,"item":{"type":"agentMessage","id":"answer-1","text":"你好，Tether"}}}
+{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"completed","error":null}}}

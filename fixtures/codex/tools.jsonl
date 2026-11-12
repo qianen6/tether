@@ -1,0 +1,12 @@
+{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":1,"item":{"type":"reasoning","id":"r","summary":["先检查","再修改"],"content":[]}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":1,"item":{"type":"commandExecution","id":"c","command":"echo hi","cwd":"/work","status":"inProgress","commandActions":[]}}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":2,"item":{"type":"commandExecution","id":"c","command":"echo hi","cwd":"/work","status":"completed","commandActions":[],"exitCode":0,"aggregatedOutput":"hi"}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":2,"item":{"type":"fileChange","id":"f","status":"inProgress","changes":[{"path":"a.txt","kind":{"type":"add"},"diff":"+hi"}]}}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":3,"item":{"type":"fileChange","id":"f","status":"completed","changes":[{"path":"a.txt","kind":{"type":"add"},"diff":"+hi"}]}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":3,"item":{"type":"mcpToolCall","id":"m","server":"local","tool":"lookup","arguments":{"key":"hi"},"status":"inProgress"}}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":4,"item":{"type":"mcpToolCall","id":"m","server":"local","tool":"lookup","arguments":{"key":"hi"},"status":"completed","result":{"content":[{"type":"text","text":"found"}]}}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":4,"item":{"type":"webSearch","id":"w","query":"synthetic query","action":{"type":"search","query":"synthetic query"}}}}
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":5,"item":{"type":"webSearch","id":"w","query":"synthetic query","action":{"type":"search","query":"synthetic query"}}}}
+{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"completed"}}}

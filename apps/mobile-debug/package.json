@@ -1,0 +1,44 @@
+{
+  "name": "mobile-debug",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "postinstall": "node scripts/build-terminal.mjs && node scripts/gen-icons.mjs",
+    "eas-build-pre-install": "sh ../../scripts/fetch-vendor.sh mobile",
+    "build:android": "eas build -p android --profile preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tether/client": "workspace:*",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-unicode-graphemes": "0.4.0",
+    "@xterm/addon-webgl": "0.19.0",
+    "@xterm/xterm": "^6.0.0",
+    "expo": "~58.0.23",
+    "expo-build-properties": "~58.0.12",
+    "expo-clipboard": "~58.0.4",
+    "expo-file-system": "~58.0.13",
+    "expo-font": "~58.0.11",
+    "expo-image-picker": "~58.0.10",
+    "expo-notifications": "~58.1.8",
+    "expo-secure-store": "~58.0.2",
+    "expo-status-bar": "~58.0.4",
+    "markdown-it": "^14.3.3",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-svg": "15.16.0",
+    "react-native-tailpocket": "file:../../vendor/tailpocket/pkg/react-native-tailpocket.tgz",
+    "react-native-webview": "14.0.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@types/react": "~19.3.0",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  }
+}

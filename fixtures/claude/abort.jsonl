@@ -1,0 +1,5 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-abort"}
+{"type":"control_request","request_id":"perm-abort","request":{"subtype":"can_use_tool","tool_name":"Write","input":{"file_path":"notes.txt","content":"hello"},"permission_suggestions":null}}
+// after_answer
+{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["Interrupted by user"],"duration_ms":75,"total_cost_usd":0}

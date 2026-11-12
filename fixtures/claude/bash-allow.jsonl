@@ -1,0 +1,7 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-bash"}
+{"type":"assistant","message":{"id":"msg-bash","content":[{"type":"tool_use","id":"tool-bash","name":"Bash","input":{"command":"cargo test --offline","description":"运行本地测试"}}]}}
+{"type":"control_request","request_id":"perm-bash","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"cargo test --offline","description":"运行本地测试"},"permission_suggestions":[]}}
+// after_answer
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-bash","content":"test result: ok","is_error":false}]}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1000,"total_cost_usd":0.002}

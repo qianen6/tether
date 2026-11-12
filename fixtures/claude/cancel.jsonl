@@ -1,0 +1,7 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-cancel"}
+{"type":"control_request","request_id":"perm-cancel","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"pwd"},"permission_suggestions":[]}}
+// after_cancel
+{"type":"control_cancel_request","request_id":"perm-cancel"}
+// after_answer
+{"type":"result","subtype":"success","is_error":false,"duration_ms":15,"total_cost_usd":0}

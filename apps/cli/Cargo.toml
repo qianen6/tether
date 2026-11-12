@@ -1,0 +1,28 @@
+[package]
+name = "tether"
+description = "Tether command line: run the computer side headless, pair phones, manage devices"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tether"
+path = "src/main.rs"
+
+[dependencies]
+tether-host.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+qrcode.workspace = true
+tether-proto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+hex.workspace = true
+subtle.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

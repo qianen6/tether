@@ -1,0 +1,18 @@
+[package]
+name = "tether-adapter-claude"
+description = "Claude Code adapter (stream-json control protocol)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+tether-agent-api.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+which.workspace = true
+
+[dev-dependencies]

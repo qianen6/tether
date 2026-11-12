@@ -1,0 +1,24 @@
+Tether
+Copyright (c) 2026 Tether contributors. Licensed under the MIT License.
+
+This project uses or adapts code, designs and assets from the following projects.
+
+TailPocket — https://github.com/jt-wang/tailpocket
+  Copyright (c) Jingtao Wang. MIT License.
+  Used: the computer-side helper (tailpocket-host), the phone SDKs (react-native-tailpocket),
+  and the helper's control protocol (sdk/node).
+  TailPocket is built on Tailscale's Tailcat (https://github.com/tailscale/tailcat, BSD-3-Clause);
+  see TailPocket's own NOTICE for its dependencies.
+
+Boop — https://github.com/jt-wang/boop
+  Copyright (c) Jingtao Wang. MIT License.
+  Adapted: pairing lockout, the harness interface design, device/tunnel linking.
+
+Herdr Anywhere — https://github.com/jt-wang/herdr-anywhere
+  Copyright (c) Jingtao Wang. MIT License.
+  Adapted: terminal interaction design, revoke-and-disconnect behaviour, and the look of the
+  phone app (apps/mobile-debug): colours, status marks, layout.
+  Copied unchanged into apps/mobile-debug/assets/herdr (see the README there):
+  - UI and program icons from the Herdr desktop app (https://github.com/herdrdev/herdr-app),
+    Apache License 2.0.
+  - Geist and JetBrains Mono fonts, SIL Open Font License 1.1.

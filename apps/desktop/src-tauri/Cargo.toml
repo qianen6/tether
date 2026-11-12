@@ -1,0 +1,40 @@
+[package]
+name = "tether-desktop"
+description = "Tether desktop app (Tauri)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "tether_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "tether-desktop"
+path = "src/main.rs"
+
+[features]
+# Tauri CLI enables this for packaged builds; dev continues to use Vite.
+custom-protocol = ["tauri/custom-protocol"]
+# A canned Host for UI development and tests (T09).
+fake-host = []
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+tether-host.workspace = true
+tether-proto.workspace = true
+tauri.workspace = true
+tauri-plugin-autostart.workspace = true
+tauri-plugin-single-instance.workspace = true
+keepawake.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tauri = { workspace = true, features = ["test"] }

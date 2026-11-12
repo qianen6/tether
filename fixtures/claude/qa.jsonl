@@ -1,0 +1,8 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-qa"}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg-qa"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"你好"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"，手机"}}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"assistant","message":{"id":"msg-qa","content":[{"type":"text","text":"你好，手机"},{"type":"thinking","thinking":"保持简短回答"}]}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":250,"total_cost_usd":0.001}

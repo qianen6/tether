@@ -1,0 +1,12 @@
+target/
+node_modules/
+.ref/
+vendor/tailpocket/bin/
+vendor/tailpocket/pkg/
+dist/
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store
+apps/desktop/src-tauri/gen/

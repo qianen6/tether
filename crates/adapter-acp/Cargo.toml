@@ -1,0 +1,20 @@
+[package]
+name = "tether-adapter-acp"
+description = "Agent Client Protocol adapter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+tether-agent-api.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+which.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

@@ -1,0 +1,3 @@
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"user_message_chunk","messageId":"user-old","content":{"type":"text","text":"历史问题"}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"agent_message_chunk","messageId":"assistant-old","content":{"type":"text","text":"历史回复"}}}}
+{"jsonrpc":"2.0","id":2,"result":{}}

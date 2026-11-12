@@ -1,0 +1,7 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-edit"}
+{"type":"assistant","message":{"id":"msg-edit","content":[{"type":"tool_use","id":"tool-edit","name":"Edit","input":{"file_path":"src/main.rs","old_string":"old","new_string":"new"}}]}}
+{"type":"control_request","request_id":"perm-edit","request":{"subtype":"can_use_tool","tool_name":"Edit","input":{"file_path":"src/main.rs","old_string":"old","new_string":"new"}}}
+// after_answer
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tool-edit","content":[{"type":"text","text":"用户拒绝修改"}],"is_error":true}]}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":100,"total_cost_usd":0.001}

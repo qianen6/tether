@@ -1,0 +1,5 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-session"}
+{"type":"control_request","request_id":"perm-session","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"git status","description":"查看工作区"},"permission_suggestions":[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"git status"}],"behavior":"allow","destination":"session"}]}}
+// after_answer
+{"type":"result","subtype":"success","is_error":false,"duration_ms":50,"total_cost_usd":0}

@@ -1,0 +1,12 @@
+[package]
+name = "tether-proto"
+description = "Tether wire protocol v1 (docs/PROTOCOL.md), shared with the TypeScript client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+ts-rs.workspace = true

@@ -1,0 +1,8 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+overrides:
+  # react-native-tailpocket points at a GitHub release URL; use the vendored,
+  # SHA-256-checked copy (scripts/fetch-vendor.sh) instead.
+  tailpocket-client: "file:vendor/tailpocket/pkg/tailpocket-client.tgz"

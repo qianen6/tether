@@ -1,0 +1,6 @@
+{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+{"type":"system","subtype":"init","session_id":"claude-saved-session"}
+{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg-resumed"}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"继续"}}}
+{"type":"assistant","message":{"id":"msg-resumed","content":[{"type":"text","text":"继续"}]}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":5,"total_cost_usd":0}

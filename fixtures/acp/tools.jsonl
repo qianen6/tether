@@ -1,0 +1,8 @@
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"先检查"}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"plan","entries":[{"content":"检查代码","priority":"high","status":"pending"}]}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call","toolCallId":"read-1","title":"读取文件","kind":"read","status":"in_progress"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call_update","toolCallId":"read-1","content":[{"type":"content","content":{"type":"text","text":"文件内容"}}]}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call_update","toolCallId":"read-1","status":"completed"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call","toolCallId":"exec-1","title":"运行测试","kind":"execute","status":"in_progress"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"mock-session","update":{"sessionUpdate":"tool_call_update","toolCallId":"exec-1","status":"failed","rawOutput":"测试失败"}}}
+{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}

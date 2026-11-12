@@ -1,0 +1,6 @@
+{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"item/agentMessage/delta","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"a","delta":"正在思考"}}
+// INTERRUPT
+{"id":4,"result":{}}
+{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"interrupted"}}}

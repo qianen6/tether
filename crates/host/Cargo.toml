@@ -1,0 +1,33 @@
+[package]
+name = "tether-host"
+description = "Assembles the Tether computer side"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tether-proto.workspace = true
+tether-store.workspace = true
+tether-agent-api.workspace = true
+tether-adapter-codex.workspace = true
+tether-adapter-claude.workspace = true
+tether-adapter-acp.workspace = true
+tether-terminals.workspace = true
+tether-tunnel.workspace = true
+tether-server.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+which.workspace = true
+directories.workspace = true
+toml.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+
+[dev-dependencies]
+tempfile.workspace = true
+futures.workspace = true
+tokio-tungstenite.workspace = true

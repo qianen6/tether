@@ -1,0 +1,7 @@
+{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":1,"item":{"type":"fileChange","id":"edit-1","status":"inProgress","changes":[{"path":"a.txt","kind":{"type":"add"},"diff":"+hi\n"}]}}}
+{"id":"file-callback","method":"item/fileChange/requestApproval","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"edit-1","reason":"创建文件","startedAtMs":1}}
+// ANSWER
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":2,"item":{"type":"fileChange","id":"edit-1","status":"completed","changes":[{"path":"a.txt","kind":{"type":"add"},"diff":"+hi\n"}]}}}
+{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"completed"}}}

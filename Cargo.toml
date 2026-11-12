@@ -1,0 +1,73 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/proto",
+    "crates/store",
+    "crates/agent-api",
+    "crates/adapter-codex",
+    "crates/adapter-claude",
+    "crates/adapter-acp",
+    "crates/terminals",
+    "crates/tunnel",
+    "crates/server",
+    "crates/host",
+    "apps/cli",
+    "apps/desktop/src-tauri",
+    "e2e",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.91"
+
+# Every dependency later tasks may need is declared here so that they can
+# build offline (see docs/tasks/T00-scaffold.md). Add new ones only in T00/T10.
+[workspace.dependencies]
+tether-proto = { path = "crates/proto" }
+tether-store = { path = "crates/store" }
+tether-agent-api = { path = "crates/agent-api" }
+tether-adapter-codex = { path = "crates/adapter-codex" }
+tether-adapter-claude = { path = "crates/adapter-claude" }
+tether-adapter-acp = { path = "crates/adapter-acp" }
+tether-terminals = { path = "crates/terminals" }
+tether-tunnel = { path = "crates/tunnel" }
+tether-server = { path = "crates/server" }
+tether-host = { path = "crates/host" }
+
+tokio = { version = "1.54", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.10"
+base64 = "0.23"
+sha2 = "0.11"
+subtle = "2.6"
+rusqlite = { version = "0.41", features = ["bundled"] }
+axum = { version = "0.8", features = ["ws"] }
+tokio-tungstenite = "0.30"
+futures = "0.3"
+bytes = "1"
+portable-pty = "0.9"
+which = "8"
+directories = "6"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+qrcode = { version = "0.14", default-features = false }
+clap = { version = "4", features = ["derive"] }
+ts-rs = { version = "12", features = ["serde-json-impl"] }
+toml = "1"
+tempfile = "3"
+hex = "0.4"
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-build = "2.7"
+tauri-plugin-autostart = "2.7"
+tauri-plugin-single-instance = "2.5"
+keepawake = "0.6"
+
+[profile.release]
+lto = "thin"
+strip = true

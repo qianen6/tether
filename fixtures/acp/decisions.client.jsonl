@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":"permission-1","result":{"outcome":{"outcome":"selected","optionId":"once"}}}
+{"jsonrpc":"2.0","id":"permission-1","result":{"outcome":{"outcome":"selected","optionId":"always"}}}
+{"jsonrpc":"2.0","id":"permission-1","result":{"outcome":{"outcome":"selected","optionId":"no"}}}
+{"jsonrpc":"2.0","id":"permission-1","result":{"outcome":{"outcome":"cancelled"}}}

@@ -1,0 +1,7 @@
+{"id":3,"result":{"turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"turn/started","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"inProgress"}}}
+{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","startedAtMs":1,"item":{"type":"commandExecution","id":"command-1","command":"echo hi","cwd":"/work","status":"inProgress","commandActions":[]}}}
+{"id":41,"method":"item/commandExecution/requestApproval","params":{"threadId":"thread-1","turnId":"turn-1","itemId":"command-1","command":"echo hi","cwd":"/work","reason":"测试审批","startedAtMs":1}}
+// ANSWER
+{"method":"item/completed","params":{"threadId":"thread-1","turnId":"turn-1","completedAtMs":2,"item":{"type":"commandExecution","id":"command-1","command":"echo hi","cwd":"/work","status":"completed","commandActions":[],"exitCode":0,"aggregatedOutput":"hi\n"}}}
+{"method":"turn/completed","params":{"threadId":"thread-1","turn":{"id":"turn-1","items":[],"status":"completed"}}}
