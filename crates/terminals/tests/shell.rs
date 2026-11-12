@@ -254,7 +254,9 @@ fn spawn_failure_and_invalid_cwd_do_not_register_a_terminal() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // Not executable: an executable text file runs as a shell script on
+        // Linux (execvp's fallback), and would start after all.
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o644)).unwrap();
     }
     assert!(
         manager

@@ -113,6 +113,11 @@ fn thread(id: &str) -> HistoryThread {
     }
 }
 
+/// A folder as the server records it.
+fn real(path: &std::path::Path) -> std::path::PathBuf {
+    crate::gateway::simplify(std::fs::canonicalize(path).unwrap())
+}
+
 async fn picky() -> (Server, Arc<Picky>, Phone, tempfile::TempDir) {
     picky_releasing(None).await
 }
@@ -336,6 +341,9 @@ async fn a_project_conversation_starts_in_its_project_and_can_be_revealed() {
     let other = dir.path().join("meet");
     std::fs::create_dir_all(&root).unwrap();
     std::fs::create_dir_all(&other).unwrap();
+    // As the server records folders: macOS' /var is /private/var, Windows'
+    // temp folder may come in its short (RUNNER~1) form.
+    let (root, other) = (real(&root), real(&other));
     let info = session(
         phone
             .call(
@@ -474,7 +482,7 @@ async fn a_fork_starts_from_a_copy_and_leaves_the_original() {
     );
     // Not the original's yet, and a chat copy keeps the folder it was given.
     assert_eq!(info.thread, None);
-    assert_eq!(std::path::Path::new(&info.cwd), dir.path());
+    assert_eq!(std::path::Path::new(&info.cwd), real(dir.path()));
     phone.subscribe(&info.id, 0).await;
     turn(&mut phone, &info.id, "hi").await;
     let spawned = lock(&agent.spawns)[0].clone();

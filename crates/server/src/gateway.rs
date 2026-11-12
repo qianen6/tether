@@ -1067,7 +1067,7 @@ pub(crate) fn cwd_path(cwd: Option<String>) -> Result<PathBuf> {
 }
 
 /// `\\?\C:\x` → `C:\x` (Windows canonical paths), when that means the same.
-fn simplify(path: PathBuf) -> PathBuf {
+pub(crate) fn simplify(path: PathBuf) -> PathBuf {
     let Some(s) = path.to_str() else { return path };
     match s.strip_prefix(r"\\?\") {
         Some(rest) if rest.len() >= 3 && rest.as_bytes()[1] == b':' && !rest.contains("..") => {
