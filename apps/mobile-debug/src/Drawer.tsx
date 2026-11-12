@@ -8,7 +8,7 @@ const EDGE = 22;
 /** How far past its width the closed panel sits, so its shadow stays off screen. */
 const PAST = 24;
 
-export function Drawer(props: { open: boolean; onOpenChange: (open: boolean) => void; panel: ReactNode; children: ReactNode }) {
+export function Drawer(props: { open: boolean; onOpenChange: (open: boolean) => void; panel: ReactNode; children: ReactNode; disabled?: boolean }) {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const w = Math.min(Math.round(width * 0.86), 380);
@@ -54,6 +54,9 @@ export function Drawer(props: { open: boolean; onOpenChange: (open: boolean) => 
   const outside = useMemo(() => handlers(true), []);
 
   const dim = x.interpolate({ inputRange: [-w - PAST, 0], outputRange: [0, 0.32], extrapolate: "clamp" });
+  // Off (the sidebar stands beside the content): the content keeps its place, so it is not
+  // started over when the screen turns.
+  if (props.disabled) return <View style={{ flex: 1 }}>{props.children}</View>;
   return (
     <View style={{ flex: 1 }}>
       {props.children}

@@ -520,6 +520,8 @@ pub enum AgentKind {
     Codex,
     Claude,
     Acp,
+    /// DeepSeek Harness, through its `dsh web` gateway.
+    Dsh,
     Terminal,
     Echo,
 }

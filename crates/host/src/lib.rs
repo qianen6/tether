@@ -49,6 +49,8 @@ pub struct CustomAgent {
 pub enum CustomMode {
     Acp,
     Terminal,
+    /// DeepSeek Harness; `command` is the `dsh` launcher.
+    Dsh,
 }
 
 #[derive(Debug, Clone, PartialEq)]

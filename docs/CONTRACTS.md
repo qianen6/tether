@@ -306,7 +306,7 @@ pub struct HostStatus { pub tunnel_address: Option<String>, pub gateway: SocketA
 
 T10 实现说明（不改上面的签名）：
 
-- 数据目录内容：`config.toml`（`name`、`derp_map_url`）、`agents.toml`（`[[agent]] id / name / command / mode = "acp" | "terminal"`，首次启动生成带注释的模板）、`tether.db`、`tunnel-state.json`、`tether.log`（CLI）、`control.json`（运行中的 `tether serve` 的本地控制端口与令牌）。
+- 数据目录内容：`config.toml`（`name`、`derp_map_url`）、`agents.toml`（`[[agent]] id / name / command / mode = "acp" | "terminal" | "dsh"`，首次启动生成带注释的模板）、`tether.db`、`tunnel-state.json`、`tether.log`（CLI）、`control.json`（运行中的 `tether serve` 的本地控制端口与令牌）。
 - agent 列表：内置 codex、claude；ACP 预设 gemini、opencode、kimi、qwen、cursor、copilot（命令未经验证）；`shell`（仅终端）；`agents.toml` 中同 id 的条目覆盖内置项。环境变量 `TETHER_ENABLE_ECHO=1` 额外提供 echo（端到端测试用）。
 - 手机加入隧道（`PhoneJoined`）与网关配对（`on_paired`）按先进先出关联，再 `set_phone_key`；超时未配对的隧道手机会被移出隧道。
 - 找不到 `tailpocket-host` 时 `Host::start` 返回错误。

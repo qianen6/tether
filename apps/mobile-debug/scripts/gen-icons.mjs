@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../assets/herdr");
-const TINTED = new Set(["gemini", "opencode", "cursor", "copilot", "shell", "agent", "program"]);
+const TINTED = new Set(["gemini", "opencode", "cursor", "copilot", "shell", "agent", "program", "dsh"]);
 
 const load = (dir, tint) =>
   Object.fromEntries(

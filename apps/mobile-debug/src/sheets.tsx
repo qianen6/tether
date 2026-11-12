@@ -65,7 +65,7 @@ const DETAIL: Record<string, string> = {
   codex: "命令行里的 codex（npm 安装，自己更新）",
   "codex-desktop": "Codex 桌面 App 自带的 codex，随 App 更新",
 };
-const KIND: Record<string, string> = { codex: "Codex app-server", claude: "Claude Code", acp: "ACP", terminal: "终端" };
+const KIND: Record<string, string> = { codex: "Codex app-server", claude: "Claude Code", acp: "ACP", dsh: "DeepSeek Harness（dsh web）", terminal: "终端" };
 
 export function NewSessionSheet({ visible, onClose, onCreated, onChat, cwd: start }: { visible: boolean; onClose: () => void; onCreated: (id: string) => void; onChat?: () => void; cwd?: string }) {
   const t = useTheme();
@@ -142,7 +142,7 @@ export function NewTerminalSheet({ visible, onClose, onPick }: { visible: boolea
 }
 
 /** The computer's projects, to start a conversation in one. */
-export function ProjectSheet({ visible, onClose, projects, onPick }: { visible: boolean; onClose: () => void; projects: ProjectInfo[]; onPick: (p: ProjectInfo) => void }) {
+export function ProjectSheet({ visible, onClose, projects, onPick, label }: { visible: boolean; onClose: () => void; projects: ProjectInfo[]; onPick: (p: ProjectInfo) => void; label?: string }) {
   const t = useTheme();
   const [query, setQuery] = useState("");
   useEffect(() => {
@@ -175,7 +175,7 @@ export function ProjectSheet({ visible, onClose, projects, onPick }: { visible: 
             </View>
           </Row>
         ))}
-        {!shown.length ? <Empty text={q ? "没有找到" : "电脑上的 Codex 里还没有项目。"} /> : null}
+        {!shown.length ? <Empty text={q ? "没有找到" : `电脑上的 ${label ?? "Codex"} 里还没有项目。`} /> : null}
       </ScrollView>
     </Sheet>
   );

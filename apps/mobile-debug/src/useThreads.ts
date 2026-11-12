@@ -1,7 +1,7 @@
-// The conversations the computer's Codex keeps, wherever they were started (its desktop
+// The conversations the computer's agent (Codex, DSH) keeps, wherever they were started (its desktop
 // app, the command line, this phone). The phone's copy shows at once; the computer's list
 // replaces it when connected.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { HistoryThread, ProjectInfo } from "@tether/client";
 import { history } from "./files";
 import { link } from "./link";
@@ -18,6 +18,18 @@ export function useThreads(agent: string | undefined, search = "") {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
   const open = snap.phase === "open";
+  /** The agent shown now: an answer for another one (switched away meanwhile) is dropped. */
+  const shown = useRef(agent);
+  shown.current = agent;
+
+  // Another agent: nothing of the last one's stays on screen.
+  useEffect(() => {
+    setThreads([]);
+    setProjects([]);
+    setCursor(null);
+    setLoadedAt(0);
+    setError(undefined);
+  }, [agent]);
 
   const load = useCallback(async () => {
     const client = link.client;
@@ -25,6 +37,7 @@ export function useThreads(agent: string | undefined, search = "") {
     setLoading(true);
     try {
       const page = await client.listHistory(agent, search ? { search } : undefined);
+      if (shown.current !== agent) return;
       setThreads(page.threads);
       setCursor(page.next_cursor ?? null);
       setLoadedAt(search ? 0 : Date.now());
@@ -36,7 +49,7 @@ export function useThreads(agent: string | undefined, search = "") {
         void history.saveProjects(agent, page.projects);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (shown.current === agent) setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -44,8 +57,8 @@ export function useThreads(agent: string | undefined, search = "") {
 
   useEffect(() => {
     if (!agent || search) return;
-    void history.threads(agent).then(saved => saved && setThreads(t => (t.length ? t : saved)));
-    void history.projects(agent).then(saved => saved && setProjects(p => (p.length ? p : saved)));
+    void history.threads(agent).then(saved => saved && shown.current === agent && setThreads(t => (t.length ? t : saved)));
+    void history.projects(agent).then(saved => saved && shown.current === agent && setProjects(p => (p.length ? p : saved)));
   }, [agent, search]);
   useEffect(() => {
     // Typing settles before asking the computer.
@@ -59,6 +72,7 @@ export function useThreads(agent: string | undefined, search = "") {
     setLoading(true);
     try {
       const page = await client.listHistory(agent, { ...(search ? { search } : {}), cursor });
+      if (shown.current !== agent) return;
       setThreads(t => [...t, ...page.threads.filter(x => !t.some(y => y.id === x.id))]);
       setCursor(page.next_cursor ?? null);
     } catch (e) {

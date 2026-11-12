@@ -4,6 +4,7 @@
 // vitest runs it with a memory store.
 import type { AgentInfo, Event, HistoryReadData, HistoryThread, ModelInfo, PermissionInfo, ProjectInfo } from "@tether/client";
 import { applyEvent, emptyChat, type ChatItem } from "./model";
+import type { Family, FamilyKey } from "./agents";
 
 /** Where the copy lives: files on the phone, a map in tests. */
 export interface KV {
@@ -130,6 +131,16 @@ export class HistoryCache {
     return this.write(() => this.kv.set("codex", agent));
   }
 
+  /** The families the drawer showed last and the one chosen, so its tabs show before the computer answers. */
+  async families(): Promise<{ list: Family[]; current?: FamilyKey }> {
+    const saved = await readJson<{ list?: Family[]; current?: FamilyKey }>(this.kv, "families");
+    return { list: saved?.list ?? [], current: saved?.current };
+  }
+
+  saveFamilies(list: Family[], current: FamilyKey | undefined): Promise<void> {
+    return this.write(() => this.kv.set("families", JSON.stringify({ list, current })));
+  }
+
   models(agent: string): Promise<ModelInfo[] | undefined> {
     return readJson<ModelInfo[]>(this.kv, `models/${agent}`);
   }
@@ -240,6 +251,7 @@ export function modelParts(pick: Pick, models: ModelInfo[] = []): { model: strin
 /** As the Codex app names them. */
 export const EFFORT_WORD: Record<string, string> = {
   none: "不思考",
+  off: "不思考",
   minimal: "最少",
   low: "低",
   medium: "中",

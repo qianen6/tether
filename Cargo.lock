@@ -4454,6 +4454,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tether-adapter-dsh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.23.1",
+ "futures",
+ "serde_json",
+ "tempfile",
+ "tether-agent-api",
+ "tether-proto",
+ "tokio",
+ "tokio-tungstenite 0.30.0",
+ "tracing",
+ "uuid",
+ "which",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "tether-agent-api"
 version = "0.1.0"
 dependencies = [
@@ -4511,6 +4530,7 @@ dependencies = [
  "tether-adapter-acp",
  "tether-adapter-claude",
  "tether-adapter-codex",
+ "tether-adapter-dsh",
  "tether-agent-api",
  "tether-proto",
  "tether-server",

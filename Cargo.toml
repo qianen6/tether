@@ -7,6 +7,7 @@ members = [
     "crates/adapter-codex",
     "crates/adapter-claude",
     "crates/adapter-acp",
+    "crates/adapter-dsh",
     "crates/terminals",
     "crates/tunnel",
     "crates/server",
@@ -31,6 +32,7 @@ tether-agent-api = { path = "crates/agent-api" }
 tether-adapter-codex = { path = "crates/adapter-codex" }
 tether-adapter-claude = { path = "crates/adapter-claude" }
 tether-adapter-acp = { path = "crates/adapter-acp" }
+tether-adapter-dsh = { path = "crates/adapter-dsh" }
 tether-terminals = { path = "crates/terminals" }
 tether-tunnel = { path = "crates/tunnel" }
 tether-server = { path = "crates/server" }

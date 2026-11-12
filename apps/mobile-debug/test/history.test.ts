@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentInfo, HistoryReadData, HistoryThread, ModelInfo } from "@tether/client";
-import { chatTitle, HistoryCache, KEEP_THREADS, memoryKV, modelParts, pickCodex, preludeItems, resolvePick, speedDetail, speedWord, NO_PERMISSIONS, permissionOf } from "../src/history";
+import { chatTitle, effortWord, HistoryCache, KEEP_THREADS, memoryKV, modelParts, pickCodex, preludeItems, resolvePick, speedDetail, speedWord, NO_PERMISSIONS, permissionOf } from "../src/history";
 
 const thread = (id: string, chat = false, updated = 1): HistoryThread => ({
   id, title: `t ${id}`, preview: "", cwd: "/w", origin: "Codex Desktop", created_at: 1, updated_at: updated, chat,
@@ -26,6 +26,14 @@ describe("history cache", () => {
     expect(await again.codex()).toBeUndefined();
     await again.saveCodex("codex-desktop");
     expect(await new HistoryCache(kv).codex()).toBe("codex-desktop");
+  });
+
+  it("remembers which agent's work the drawer showed", async () => {
+    const kv = memoryKV();
+    expect(await new HistoryCache(kv).families()).toEqual({ list: [] });
+    const list = [{ key: "codex" as const, label: "Codex", agent: "codex-desktop" }, { key: "dsh" as const, label: "DSH", agent: "dsh" }];
+    await new HistoryCache(kv).saveFamilies(list, "dsh");
+    expect(await new HistoryCache(kv).families()).toEqual({ list, current: "dsh" });
   });
 
   it("forgets the least recently saved threads past the limit", async () => {
@@ -93,6 +101,7 @@ describe("views", () => {
     expect(resolvePick({ ...none, effort: "low" }, models)).toMatchObject({ id: "sol", effort: "low", speed: "priority" });
     expect(speedWord("priority", models)).toBe("快速");
     expect(speedWord("default", models)).toBe("标准");
+    expect(effortWord("off")).toBe("不思考"); // DSH turns thinking off
     expect(speedWord("turbo", models)).toBe("turbo");
     expect(speedDetail("2x speed, increased usage")).toBe("2 倍速度，用量更多");
     expect(speedDetail("1.5x speed")).toBe("1.5 倍速度");

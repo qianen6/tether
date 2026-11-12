@@ -12,6 +12,7 @@ tether-agent-api.workspace = true
 tether-adapter-codex.workspace = true
 tether-adapter-claude.workspace = true
 tether-adapter-acp.workspace = true
+tether-adapter-dsh.workspace = true
 tether-terminals.workspace = true
 tether-tunnel.workspace = true
 tether-server.workspace = true

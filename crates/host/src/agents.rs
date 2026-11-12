@@ -1,5 +1,5 @@
-//! Which agents this computer offers: built-ins, ACP presets, `agents.toml`,
-//! and a plain shell for the terminal.
+//! Which agents this computer offers: built-ins, ACP presets, DeepSeek
+//! Harness, `agents.toml`, and a plain shell for the terminal.
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -201,6 +201,14 @@ fn terminal_only(id: &str, name: &str, command: Vec<String>) -> Arc<dyn AgentAda
     })
 }
 
+fn dsh(id: &str, name: &str, command: Vec<String>) -> Arc<dyn AgentAdapter> {
+    wrap(tether_adapter_dsh::adapter(tether_adapter_dsh::DshAgent {
+        id: id.into(),
+        name: name.into(),
+        command,
+    }))
+}
+
 fn acp(id: &str, name: &str, command: Vec<String>) -> Arc<dyn AgentAdapter> {
     wrap(tether_adapter_acp::adapter(tether_adapter_acp::AcpAgent {
         id: id.into(),
@@ -247,6 +255,8 @@ pub(crate) fn discover(custom: &[CustomAgent], echo: bool) -> Vec<Arc<dyn AgentA
             terminal: Some(command[..1].iter().map(|s| s.to_string()).collect()),
         }));
     }
+    let default_dsh = tether_adapter_dsh::DshAgent::default_agent();
+    list.push(dsh(&default_dsh.id, &default_dsh.name, default_dsh.command));
     list.push(terminal_only("shell", "Shell", shell_command()));
     if echo {
         list.push(Arc::new(tether_agent_api::EchoAdapter));
@@ -255,6 +265,7 @@ pub(crate) fn discover(custom: &[CustomAgent], echo: bool) -> Vec<Arc<dyn AgentA
         let adapter = match agent.mode {
             CustomMode::Acp => acp(&agent.id, &agent.name, agent.command.clone()),
             CustomMode::Terminal => terminal_only(&agent.id, &agent.name, agent.command.clone()),
+            CustomMode::Dsh => dsh(&agent.id, &agent.name, agent.command.clone()),
         };
         match list.iter().position(|a| a.info().id == agent.id) {
             Some(i) => {
@@ -333,6 +344,7 @@ mod tests {
             "gemini",
             "opencode",
             "cursor",
+            "dsh",
             "shell",
         ] {
             assert!(ids.contains(&id.to_string()), "{id} missing");
@@ -355,6 +367,31 @@ mod tests {
             .unwrap()
             .info();
         assert_eq!(cursor.terminal_command, vec!["cursor-agent".to_string()]);
+        let dsh = list.iter().find(|a| a.info().id == "dsh").unwrap().info();
+        assert_eq!(dsh.kind, AgentKind::Dsh);
+        assert!(dsh.chat);
+        assert!(!dsh.terminal_command.is_empty());
+    }
+
+    #[test]
+    fn custom_dsh_points_at_its_launcher() {
+        let list = discover(
+            &[CustomAgent {
+                id: "dsh".into(),
+                name: "My DSH".into(),
+                command: vec!["tether-no-such-dsh-xyz".into()],
+                mode: CustomMode::Dsh,
+            }],
+            false,
+        );
+        let ours: Vec<_> = list.iter().filter(|a| a.info().id == "dsh").collect();
+        assert_eq!(ours.len(), 1, "the custom entry replaces the built-in one");
+        let info = ours[0].info();
+        assert_eq!((info.name.as_str(), info.kind), ("My DSH", AgentKind::Dsh));
+        if std::env::var_os(tether_adapter_dsh::URL_ENV).is_none() {
+            assert!(!info.available);
+            assert!(info.detail.unwrap().contains("tether-no-such-dsh-xyz"));
+        }
     }
 
     #[test]

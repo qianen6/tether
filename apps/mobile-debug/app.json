@@ -3,7 +3,7 @@
     "name": "Tether 调试",
     "slug": "tether-mobile-debug",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -23,7 +23,7 @@
         "android.permission.POST_NOTIFICATIONS"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 16
+      "versionCode": 17
     },
     "plugins": [
       "expo-secure-store",

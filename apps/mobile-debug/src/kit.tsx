@@ -194,7 +194,7 @@ export function Sheet(props: { visible: boolean; onClose: () => void; title: str
   return (
     <Modal visible={props.visible} transparent animationType="slide" onRequestClose={props.onClose} statusBarTranslucent>
       <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)" }} onPress={props.onClose} />
-      <View style={{ backgroundColor: t.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: "80%", paddingBottom: 24 }}>
+      <View style={{ backgroundColor: t.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: "80%", paddingBottom: 24, width: "100%", maxWidth: 640, alignSelf: "center" }}>
         <View style={{ alignItems: "center", paddingTop: 8 }}>
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: t.border }} />
         </View>
@@ -257,7 +257,7 @@ export interface MenuItem {
 }
 
 /** A pop-up menu under a toolbar button, as iOS shows one. */
-export function Menu(props: { visible: boolean; onClose: () => void; items: MenuItem[]; top: number; side: "left" | "right" }) {
+export function Menu(props: { visible: boolean; onClose: () => void; items: MenuItem[]; top: number; side: "left" | "right"; offset?: number }) {
   const t = useTheme();
   return (
     <Modal visible={props.visible} transparent animationType="fade" onRequestClose={props.onClose} statusBarTranslucent>
@@ -266,7 +266,7 @@ export function Menu(props: { visible: boolean; onClose: () => void; items: Menu
           style={{
             position: "absolute",
             top: props.top,
-            [props.side]: 12,
+            [props.side]: props.offset ?? 12,
             minWidth: 220,
             borderRadius: 14,
             backgroundColor: t.popover,

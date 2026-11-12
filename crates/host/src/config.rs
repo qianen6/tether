@@ -25,12 +25,19 @@ const AGENTS_TEMPLATE: &str = r#"# Extra agents for Tether.
 #
 # mode = "acp"       an Agent Client Protocol agent: chat and terminal
 # mode = "terminal"  any command line program: terminal only
+# mode = "dsh"       DeepSeek Harness: command is the dsh launcher (chat and terminal)
 #
 # [[agent]]
 # id = "my-agent"
 # name = "My Agent"
 # command = ["my-agent", "--acp"]
 # mode = "acp"
+#
+# [[agent]]
+# id = "dsh"
+# name = "DeepSeek Harness"
+# command = ["C:/path/to/dsh.cmd"]
+# mode = "dsh"
 "#;
 
 #[derive(Debug, Default, Deserialize, PartialEq)]
@@ -64,6 +71,7 @@ struct AgentEntry {
 enum Mode {
     Acp,
     Terminal,
+    Dsh,
 }
 
 /// Reads `name`, creating it from `template` first when missing.
@@ -111,6 +119,7 @@ pub(crate) fn load_agents(dir: &Path) -> anyhow::Result<Vec<CustomAgent>> {
                 mode: match a.mode {
                     Mode::Acp => CustomMode::Acp,
                     Mode::Terminal => CustomMode::Terminal,
+                    Mode::Dsh => CustomMode::Dsh,
                 },
             })
         })

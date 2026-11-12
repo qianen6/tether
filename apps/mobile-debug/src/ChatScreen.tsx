@@ -1,7 +1,7 @@
 // One conversation, laid out as Remodex's TurnView: a slim toolbar (sidebar button, title
 // and where it runs, in mono), replies as plain text and the user's messages in soft
 // bubbles, and a floating composer card: the text, then the model and effort pills and
-// the send button; under it where the work happens and what Codex may do. The pending
+// the send button; under it where the work happens and what the agent (Codex, DSH) may do. The pending
 // approval's choices sit over the composer. It opens a phone session, a conversation the
 // computer's Codex keeps (its record first, from the phone's copy, then fresh; the first
 // message continues it), or a new conversation (a chat, or work in a project or folder)
@@ -22,6 +22,8 @@ import { PermissionMenu, RuntimeMenu, useModels } from "./RuntimeMenu";
 import { useLink } from "./useLink";
 import { folderName, projectOf } from "./entries";
 import { CircleButton, Empty, Icon, Menu, Notice, shortPath, Spinner, StatusMark, STATE_WORD, stateColor, T, type IconName } from "./kit";
+import { agentLabel, familyOf } from "./agents";
+import { COLUMN, columnLeft, useAgentInfos, usePane } from "./context";
 import { alpha, MONO, useTheme } from "./theme";
 
 const COMPOSER_MIN = 24;
@@ -56,7 +58,8 @@ const TOOL_WORD: Record<string, string> = { shell: "运行", Bash: "运行", edi
 
 export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
   opening: Opening;
-  onMenu: () => void;
+  /** Opens the sidebar; none when it is always there (a wide screen). */
+  onMenu?: () => void;
   onNewChat: () => void;
   /** Which phone session this screen shows, once there is one. */
   onSession?: (id: string) => void;
@@ -68,6 +71,12 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
   const [session, setSession] = useState<string | undefined>("session" in opening ? opening.session : undefined);
   const info: SessionInfo | undefined = snap.sessions.find(s => s.id === session);
   const agent = "agent" in opening ? opening.agent : info?.agent;
+  const agents = useAgentInfos();
+  const pane = usePane();
+  /** How texts name the agent: "Codex", "DSH", … */
+  const who = agentLabel(agent, agents);
+  const family = agent ? familyOf(agent, agents) : undefined;
+  const isCodex = family === "codex";
   const [continued, setContinued] = useState<Continued | undefined>(
     "thread" in opening ? { agent: opening.agent, thread: opening.thread } : undefined,
   );
@@ -189,7 +198,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
 
   // Asked each time a conversation opens: the computer keeps the answer while its
   // settings stay as they are, and asks Codex again after a switch (CC Switch).
-  const { models, permissions, loading: modelsLoading, error: modelsError } = useModels(agent, open, false, picking || permitting);
+  const { models, permissions, loading: modelsLoading, error: modelsError, retry: retryModels } = useModels(agent, open, false, picking || permitting);
 
   // One subscription per client: TetherClient resubscribes by itself after a
   // reconnect; only a new client (after a failed start) needs a new one.
@@ -216,7 +225,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
   /** The first message: a session that continues the conversation, or a new one. */
   const start = async (typed: string): Promise<SessionInfo> => {
     const client = link.client!;
-    if (!agent) throw new Error("没有可用的 Codex");
+    if (!agent) throw new Error("没有可用的 agent");
     // A new conversation is allowed what the computer's Codex app allows now, unless chosen here.
     const choice = { model: pick.model, effort: pick.effort, speed: pick.speed, permission: pick.permission ?? permissions.default };
     if (!continued) {
@@ -343,7 +352,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
   const choosePermission = (id: string) => {
     const apply = () => choose({ ...chosen, permission: id });
     if (id !== ":danger-full-access") return apply();
-    Alert.alert("给 Codex 完全访问？", "Codex 改电脑上任何文件、运行任何命令都不再先问你。", [
+    Alert.alert(`给 ${who} 完全访问？`, `${who} 改电脑上任何文件、运行任何命令都不再先问你。`, [
       { text: "取消", style: "cancel" },
       { text: "完全访问", style: "destructive", onPress: apply },
     ]);
@@ -428,19 +437,21 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
     Alert.alert(
       isChat ? "对话" : project?.name ?? folderName(cwd),
       isChat
-        ? "没有项目的对话：Codex 在自己的文件夹里，和电脑上 Codex 的“对话”放在一起。"
+        ? isCodex
+          ? "没有项目的对话：Codex 在自己的文件夹里，和电脑上 Codex 的“对话”放在一起。"
+          : `没有项目的对话：${who} 在 Tether 的对话文件夹里。`
         : project && project.roots.length > 1
           ? `项目“${project.name}”的文件夹：\n${project.roots.join("\n")}`
           : cwd || "电脑上的默认文件夹",
     );
   // An older computer offers no choice: say what applies.
-  const explainAccess = () => Alert.alert(access.name, access.description || "电脑上的 Codex 没有提供可选的权限。");
+  const explainAccess = () => Alert.alert(access.name, access.description || `电脑上的 ${who} 没有提供可选的权限。`);
 
   const content = (
     <>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
-        <CircleButton name="menu" label="打开侧边栏" onPress={onMenu} />
-        <View style={{ flex: 1 }}>
+        {onMenu ? <CircleButton name="menu" label="打开侧边栏" onPress={onMenu} /> : null}
+        <View style={{ flex: 1, paddingLeft: onMenu ? 0 : 6 }}>
           <T size={15} weight="700" mono lines={1}>{title}</T>
           {where || working ? (
             <T size={11.5} mono color={t.sidebarForeground} lines={1}>
@@ -449,7 +460,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
             </T>
           ) : null}
         </View>
-        {threadId && agent ? <CircleButton name="laptop" label="在电脑上打开" onPress={reveal} disabled={!open} /> : null}
+        {threadId && agent && isCodex ? <CircleButton name="laptop" label="在电脑上打开" onPress={reveal} disabled={!open} /> : null}
         <CircleButton name="more" label="更多" onPress={() => setMenu(true)} />
       </View>
       {snap.phase !== "open" ? (
@@ -466,7 +477,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
         <FlatList
           ref={list}
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12, gap: 16 }}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12, gap: 16, width: "100%", maxWidth: COLUMN, alignSelf: "center" }}
           data={shown}
           keyExtractor={x => x.key}
           keyboardShouldPersistTaps="handled"
@@ -502,7 +513,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
                   {!open ? "等待连接电脑…" : isChat ? "有什么可以帮你？" : `在 ${project?.name ?? (folderName(cwd) || "这个文件夹")} 里做点什么？`}
                 </T>
                 <T size={12.5} color={t.mutedForeground} style={{ textAlign: "center", lineHeight: 18 }}>
-                  {`${isChat ? "Codex 在自己的对话文件夹里" : `Codex 会在 ${cwd} 里工作`}。权限：${access.name}${access.description ? `，${access.description}` : ""}。`}
+                  {`${isChat ? `${who} 在自己的对话文件夹里` : `${who} 会在 ${cwd} 里工作`}。权限：${access.name}${access.description ? `，${access.description}` : ""}。`}
                 </T>
               </View>
             )
@@ -527,8 +538,12 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
           </Pressable>
         ) : null}
       </View>
-      <View onLayout={e => setComposer(e.nativeEvent.layout.height)} style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 6, gap: 8 }}>
+      <View onLayout={e => setComposer(e.nativeEvent.layout.height)} style={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 6, gap: 8, width: "100%", maxWidth: COLUMN, alignSelf: "center" }}>
         {problem ? <Notice text={problem} onClose={() => setProblem(undefined)} /> : null}
+        {/* The computer's agent cannot run yet (DSH with no model set up, or not starting): say so before anything is typed. */}
+        {modelsError && !models.length && !modelsLoading && open && !working ? (
+          <Notice tone="warn" text={modelsError} lines={6} action={{ label: "重试", onPress: retryModels }} />
+        ) : null}
         {taken ? (
           <View style={{ borderRadius: 20, borderWidth: 1, borderColor: t.border, backgroundColor: t.muted, padding: 12, gap: 8 }}>
             <T size={13} color={t.mutedForeground} style={{ lineHeight: 19 }}>电脑上的 Codex 桌面版正开着这个对话。可以复制成新对话在手机上接着聊（上一条消息会重新发出）。</T>
@@ -590,7 +605,7 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
             value={text}
             onChangeText={setText}
             onContentSizeChange={e => setHeight(e.nativeEvent.contentSize.height)}
-            placeholder={working ? "可以先写着，这一轮结束后再发…" : items.length || continued ? "继续追问…" : isChat ? "问点什么…" : "告诉 Codex 要做什么…"}
+            placeholder={working ? "可以先写着，这一轮结束后再发…" : items.length || continued ? "继续追问…" : isChat ? `问 ${who} 点什么…` : `告诉 ${who} 要做什么…`}
             placeholderTextColor={t.sidebarForeground}
           />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 8, paddingTop: 8 }}>
@@ -631,6 +646,9 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
       <PermissionMenu
         visible={permitting}
         onClose={() => setPermitting(false)}
+        left={columnLeft(pane, COLUMN, 14)}
+        who={who}
+        codex={isCodex}
         bottom={insets.bottom + keyboard + 8}
         list={permissions.list}
         current={access.id}
@@ -639,6 +657,8 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
       <RuntimeMenu
         visible={picking}
         onClose={() => setPicking(false)}
+        left={columnLeft(pane, COLUMN, 14)}
+        family={family}
         bottom={insets.bottom + keyboard + composer + 4}
         models={models}
         loading={modelsLoading}
@@ -653,8 +673,8 @@ export function ChatScreen({ opening, onMenu, onNewChat, onSession }: {
         side="right"
         items={[
           { label: "新对话", icon: "square-pen", onPress: onNewChat },
-          { label: "模型、思考与速度", icon: "sparkles", onPress: () => setPicking(true), disabled: !agent },
-          ...(threadId && agent ? [{ label: "在电脑上打开", icon: "laptop" as const, onPress: reveal, disabled: !open }] : []),
+          { label: isCodex ? "模型、思考与速度" : "模型与思考", icon: "sparkles", onPress: () => setPicking(true), disabled: !agent },
+          ...(threadId && agent && isCodex ? [{ label: "在电脑上打开", icon: "laptop" as const, onPress: reveal, disabled: !open }] : []),
           ...(session ? [{ label: "关闭会话", icon: "x" as const, onPress: close, danger: true }] : []),
         ]}
       />

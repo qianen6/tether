@@ -8,6 +8,7 @@ import type { ModelInfo, PermissionInfo } from "@tether/client";
 import { history } from "./files";
 import { effortWord, NO_PERMISSIONS, resolvePick, speedDetail, speedWord, type Permissions, type Pick } from "./history";
 import { link } from "./link";
+import type { FamilyKey } from "./agents";
 import { Icon, T } from "./kit";
 import { MONO, useTheme } from "./theme";
 
@@ -24,7 +25,7 @@ export function useModels(
   when: boolean,
   once = false,
   refresh = false,
-): { models: ModelInfo[]; permissions: Permissions; loading: boolean; error?: string } {
+): { models: ModelInfo[]; permissions: Permissions; loading: boolean; error?: string; retry: () => void } {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [permissions, setPermissions] = useState<Permissions>(NO_PERMISSIONS);
   const [loading, setLoading] = useState(false);
@@ -63,7 +64,8 @@ export function useModels(
       gone = true;
     };
   }, [agent, when, refresh, woke]);
-  return { models, permissions, loading, error };
+  // Asking again (after setting the agent up on the computer) is the same as coming back.
+  return { models, permissions, loading, error, retry: () => setWoke(n => n + 1) };
 }
 
 /** What the agent may do without asking: the levels the computer's Codex offers, the current one checked. */
@@ -71,6 +73,11 @@ export function PermissionMenu(props: {
   visible: boolean;
   onClose: () => void;
   bottom: number;
+  /** Distance from the screen's left edge (the composer's, beside a tablet's sidebar). */
+  left?: number;
+  /** The agent, as texts name it, and whether it is Codex. */
+  who?: string;
+  codex?: boolean;
   list: PermissionInfo[];
   current?: string;
   onPick: (id: string) => void;
@@ -81,7 +88,7 @@ export function PermissionMenu(props: {
       <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.06)" }} onPress={props.onClose} />
       <View
         style={{
-          position: "absolute", left: 14, bottom: props.bottom, width: 300, maxHeight: 420, borderRadius: 18,
+          position: "absolute", left: props.left ?? 14, bottom: props.bottom, width: 300, maxHeight: 420, borderRadius: 18,
           backgroundColor: t.popover, borderWidth: 1, borderColor: t.border, paddingVertical: 4,
           shadowColor: "#000", shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 14,
         }}
@@ -105,7 +112,9 @@ export function PermissionMenu(props: {
             </Pressable>
           ))}
           <T size={11.5} color={t.sidebarForeground} style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, lineHeight: 16 }}>
-            选项来自电脑上的 Codex；新对话默认用电脑上 Codex 桌面版当前的选择。
+            {props.codex === false
+              ? `选项来自电脑上的 ${props.who ?? "agent"}；新对话默认用它在电脑上的设置。`
+              : "选项来自电脑上的 Codex；新对话默认用电脑上 Codex 桌面版当前的选择。"}
           </T>
         </ScrollView>
       </View>
@@ -122,6 +131,10 @@ export function RuntimeMenu(props: {
   onClose: () => void;
   /** Distance from the bottom of the screen to the menu's bottom edge. */
   bottom: number;
+  /** Distance from the screen's left edge. */
+  left?: number;
+  /** Whose models: Codex has speeds and relays; DSH names models "provider/model". */
+  family?: FamilyKey;
   models: ModelInfo[];
   loading?: boolean;
   error?: string;
@@ -140,8 +153,11 @@ export function RuntimeMenu(props: {
 
   const { models, current } = props;
   const now = resolvePick(current, models);
-  const efforts = now.model?.efforts.length ? now.model.efforts : FALLBACK_EFFORTS;
+  const codex = !props.family || props.family === "codex";
+  // An unknown model: Codex's usual levels; another agent's are not guessed.
+  const efforts = now.model?.efforts.length ? now.model.efforts : codex ? FALLBACK_EFFORTS : [];
   const speeds = now.model?.speeds ?? [];
+  const hasSpeeds = codex || models.some(m => m.speeds?.length);
   const pick = (p: Partial<Pick>, close: boolean) => {
     props.onPick({ ...current, ...p });
     if (close) props.onClose();
@@ -189,11 +205,15 @@ export function RuntimeMenu(props: {
   if (page === "main") {
     body = (
       <>
-        <T size={13} weight="500" color={t.sidebarForeground} style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>智能</T>
-        {efforts.map(e => row({ key: e, label: effortWord(e), on: e === now.effort, onPress: () => pick({ effort: e }, true) }))}
-        <View style={{ height: 1, backgroundColor: t.border, marginVertical: 6, marginHorizontal: 12 }} />
+        {efforts.length ? (
+          <>
+            <T size={13} weight="500" color={t.sidebarForeground} style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>{codex ? "智能" : "思考"}</T>
+            {efforts.map(e => row({ key: e, label: effortWord(e), on: e === now.effort, onPress: () => pick({ effort: e }, true) }))}
+            <View style={{ height: 1, backgroundColor: t.border, marginVertical: 6, marginHorizontal: 12 }} />
+          </>
+        ) : null}
         {row({ key: "model", label: "模型", chevron: now.model?.name ?? now.id ?? "默认", onPress: () => setPage("model") })}
-        {row({ key: "speed", label: "速度", chevron: speedWord(now.speed, models), onPress: () => setPage("speed") })}
+        {hasSpeeds ? row({ key: "speed", label: "速度", chevron: speedWord(now.speed, models), onPress: () => setPage("speed") }) : null}
       </>
     );
   } else if (page === "model") {
@@ -203,9 +223,16 @@ export function RuntimeMenu(props: {
         {props.loading && !models.length ? <ActivityIndicator style={{ margin: 12 }} color={t.mutedForeground} /> : null}
         {props.error && !models.length ? <T size={12.5} color={t.destructive} style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{props.error}</T> : null}
         {models.map(m =>
-          row({ key: m.id, label: m.name, detail: m.is_default ? "电脑上的默认" : undefined, on: m.id === now.id, onPress: () => chooseModel(m.id) }),
+          row({
+            key: m.id,
+            label: m.name,
+            // Codex's own notes are long; another agent's say what matters (no API key yet).
+            detail: [m.is_default ? "电脑上的默认" : "", !codex && m.description ? m.description : ""].filter(Boolean).join(" · ") || undefined,
+            on: m.id === now.id,
+            onPress: () => chooseModel(m.id),
+          }),
         )}
-        {row({ key: "other", label: "其他模型…", detail: "中转提供的模型名", chevron: "", onPress: () => setPage("other") })}
+        {row({ key: "other", label: "其他模型…", detail: codex ? "中转提供的模型名" : "服务商/模型", chevron: "", onPress: () => setPage("other") })}
       </>
     );
   } else if (page === "speed") {
@@ -228,7 +255,7 @@ export function RuntimeMenu(props: {
             autoFocus
             autoCapitalize="none"
             autoCorrect={false}
-            placeholder="例如 gpt-6.1-sol"
+            placeholder={codex ? "例如 gpt-6.1-sol" : "例如 deepseek-official/deepseek-v4-pro"}
             placeholderTextColor={t.sidebarForeground}
             onSubmitEditing={() => typed.trim() && chooseModel(typed.trim())}
             style={{ borderRadius: 12, borderWidth: 1, borderColor: t.input, paddingHorizontal: 12, paddingVertical: 9, color: t.foreground, fontFamily: MONO, fontSize: 14 }}
@@ -247,7 +274,7 @@ export function RuntimeMenu(props: {
       <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.06)" }} onPress={props.onClose} />
       <View
         style={{
-          position: "absolute", left: 14, bottom: props.bottom, width: 280, maxHeight: 460, borderRadius: 18,
+          position: "absolute", left: props.left ?? 14, bottom: props.bottom, width: 280, maxHeight: 460, borderRadius: 18,
           backgroundColor: t.popover, borderWidth: 1, borderColor: t.border, paddingVertical: 4,
           shadowColor: "#000", shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 14,
         }}

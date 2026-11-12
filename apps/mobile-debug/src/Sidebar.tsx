@@ -1,7 +1,7 @@
 // The drawer, after Remodex's SidebarView: the app's name with the computer's connection,
-// a search field, "新对话", then the computer's projects (each with its conversations and
-// a button for a new one in it), the chats, the terminals, and at the bottom which
-// computer it is connected to.
+// a search field, which agent's work it shows (Codex or DSH, each kept apart), "新对话",
+// then that agent's projects (each with its conversations and a button for a new one in
+// it), the chats, the terminals, and at the bottom which computer it is connected to.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,8 @@ import { link } from "./link";
 import { useLink } from "./useLink";
 import { useThreads } from "./useThreads";
 import { entries, groups, hiddenSessions, matches, pairSessions, type Entry } from "./entries";
+import { sessionsOf, type Family, type FamilyKey } from "./agents";
+import { useAgentInfos } from "./context";
 import type { Opening } from "./ChatScreen";
 import { CircleButton, duration, Icon, Menu, ProgramIcon, programOf, shortPath, Spinner, StatusMark, T, type IconName } from "./kit";
 import { alpha, FONT, useTheme } from "./theme";
@@ -20,7 +22,15 @@ const CHATS_SHOWN = 8;
 
 export function Sidebar(props: {
   visible: boolean;
-  codex?: string;
+  /** Beside the content on a wide screen, `width` wide (rather than a drawer). */
+  wide?: boolean;
+  width?: number;
+  /** The agents whose work is kept apart, and the one shown. */
+  families: Family[];
+  family?: FamilyKey;
+  onFamily: (key: FamilyKey) => void;
+  /** Where the shown family's conversations come from, and new ones go. */
+  agent?: string;
   /** The open conversation: its session id or thread id. */
   current?: string;
   onClose: () => void;
@@ -46,7 +56,9 @@ export function Sidebar(props: {
   const [links, setLinks] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const query = search.trim();
-  const { threads, projects, loading, error, more, reload, complete, loadedAt } = useThreads(props.codex, query);
+  const agents = useAgentInfos();
+  const label = props.families.find(f => f.key === props.family)?.label ?? "Codex";
+  const { threads, projects, loading, error, more, reload, complete, loadedAt } = useThreads(props.agent, query);
 
   const loadTerms = useCallback(() => {
     if (link.snapshot.phase === "open") void link.client?.listTerminals().then(setTerms).catch(() => {});
@@ -62,14 +74,16 @@ export function Sidebar(props: {
   }, [snap.sessions]);
 
   const list = useMemo(() => {
+    // Only this family's sessions: Codex's and DSH's work never mix.
+    const mine = sessionsOf(props.family, snap.sessions, agents);
     // Archived on the computer, or under the provider it switched away from: gone, as there.
-    const hidden = hiddenSessions(threads, snap.sessions, props.codex, loadedAt, complete);
-    const sessions = hidden.size ? snap.sessions.filter(s => !hidden.has(s.id)) : snap.sessions;
-    const paired = pairSessions(threads, sessions, links, props.codex);
+    const hidden = hiddenSessions(threads, mine, props.family === "codex" ? props.agent : undefined, loadedAt, complete);
+    const sessions = hidden.size ? mine.filter(s => !hidden.has(s.id)) : mine;
+    const paired = pairSessions(threads, sessions, links, props.agent);
     return entries(threads, sessions, paired)
       // The computer already searched its conversations; sessions match here.
       .filter(e => !!e.thread || matches(e, query));
-  }, [threads, snap.sessions, links, props.codex, query, loadedAt, complete]);
+  }, [threads, snap.sessions, agents, links, props.agent, props.family, query, loadedAt, complete]);
   const waiting = list.filter(e => e.session?.state === "needs_you");
   const rest = list.filter(e => e.session?.state !== "needs_you");
   const chats = rest.filter(e => e.chat);
@@ -86,7 +100,7 @@ export function Sidebar(props: {
   };
   const openEntry = (e: Entry) => {
     if (e.session) props.onOpen({ session: e.session.id });
-    else if (e.thread && props.codex) props.onOpen({ agent: props.codex, thread: e.thread });
+    else if (e.thread && props.agent) props.onOpen({ agent: props.agent, thread: e.thread });
   };
   const selected = (e: Entry) => !!props.current && (props.current === e.session?.id || props.current === e.thread?.id);
   const toggle = (set: Set<string>, key: string) => {
@@ -95,9 +109,11 @@ export function Sidebar(props: {
     return next;
   };
   const row = (e: Entry, inProject = false) => (
-    <EntryRow key={e.key} e={e} now={now} codex={props.codex} indent={inProject ? 36 : 12} selected={selected(e)} done={!!e.session && snap.done.includes(e.session.id)} onPress={() => openEntry(e)} />
+    <EntryRow key={e.key} e={e} now={now} icon={props.family === "other"} indent={inProject ? 36 : 12} selected={selected(e)} done={!!e.session && snap.done.includes(e.session.id)} onPress={() => openEntry(e)} />
   );
-  const canStart = open && !!props.codex;
+  const canStart = open && !!props.agent;
+  // "其他" has no agent of its own: a new one there picks an agent and folder.
+  const canNew = !!props.agent || open;
   const chatsOpen = expanded.has("chats");
 
   return (
@@ -116,7 +132,7 @@ export function Sidebar(props: {
         <TextInput
           value={search}
           onChangeText={setSearch}
-          placeholder="搜索对话"
+          placeholder={props.family === "other" ? "搜索对话" : `搜索 ${label} 的对话`}
           placeholderTextColor={t.sidebarForeground}
           autoCorrect={false}
           autoCapitalize="none"
@@ -129,6 +145,26 @@ export function Sidebar(props: {
           </Pressable>
         ) : null}
       </View>
+      {props.families.length > 1 ? (
+        <View accessibilityRole="tablist" style={{ flexDirection: "row", gap: 3, marginHorizontal: 16, marginBottom: 6, padding: 3, borderRadius: 12, backgroundColor: t.muted }}>
+          {props.families.map(f => {
+            const on = f.key === props.family;
+            const needs = !on && sessionsOf(f.key, snap.sessions, agents).some(s => s.state === "needs_you");
+            return (
+              <Pressable key={f.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={f.label} onPress={() => props.onFamily(f.key)}
+                style={({ pressed }) => ({
+                  flex: 1, height: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 9,
+                  backgroundColor: on ? t.background : pressed ? t.accent : "transparent",
+                  shadowColor: "#000", shadowOpacity: on ? 0.06 : 0, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: on ? 1 : 0,
+                })}>
+                {f.key === "other" ? null : <ProgramIcon program={f.key} size={14} />}
+                <T size={13.5} weight={on ? "600" : "500"} color={on ? t.foreground : t.sidebarForeground}>{f.label}</T>
+                {needs ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.chart2 }} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       <Banner />
 
       <ScrollView
@@ -137,7 +173,7 @@ export function Sidebar(props: {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <ActionRow icon="square-pen" label="新对话" disabled={!props.codex} onPress={props.onNewChat} />
+        <ActionRow icon="square-pen" label={props.agent ? `新对话（${label}）` : "新对话"} disabled={!canNew} onPress={props.onNewChat} />
         {error && !threads.length ? <T size={12.5} color={t.destructive} style={{ paddingHorizontal: 22, paddingVertical: 6 }}>{error}</T> : null}
 
         {waiting.length ? (
@@ -184,7 +220,7 @@ export function Sidebar(props: {
           })
         ) : (
           <T size={13} color={t.sidebarForeground} style={{ paddingHorizontal: 22, paddingVertical: 6, lineHeight: 19 }}>
-            {query ? "没有找到" : "电脑上 Codex 里的项目会列在这里。"}
+            {query ? "没有找到" : props.family === "dsh" ? "电脑上 DSH 的会话按文件夹列在这里。" : props.family === "other" ? "其他 agent（Claude、ACP 等）在手机上开的会话列在这里。" : "电脑上 Codex 里的项目会列在这里。"}
           </T>
         )}
 
@@ -241,9 +277,10 @@ export function Sidebar(props: {
         visible={menu}
         onClose={() => setMenu(false)}
         top={insets.top + 58}
-        side="right"
+        side={props.wide ? "left" : "right"}
+        offset={props.wide ? Math.max(12, (props.width ?? 0) - 232) : undefined}
         items={[
-          { label: "新对话", icon: "square-pen", onPress: props.onNewChat, disabled: !props.codex },
+          { label: "新对话", icon: "square-pen", onPress: props.onNewChat, disabled: !canNew },
           { label: "在项目里开始", icon: "folder-plus", onPress: () => props.onPickProject(projects), disabled: !canStart || !projects.length },
           { label: "其他 agent / 文件夹", icon: "folder", onPress: props.onNewSession, disabled: !open },
           { label: "打开终端", icon: "terminal", onPress: props.onNewTerminal, disabled: !open },
@@ -266,10 +303,10 @@ function ActionRow({ icon, label, onPress, disabled }: { icon: IconName; label: 
 }
 
 /** One conversation or session: its title, and on the right what it is doing or how long ago. */
-function EntryRow({ e, now, codex, indent, selected, done, onPress }: { e: Entry; now: number; codex?: string; indent: number; selected: boolean; done: boolean; onPress: () => void }) {
+function EntryRow({ e, now, icon, indent, selected, done, onPress }: { e: Entry; now: number; icon: boolean; indent: number; selected: boolean; done: boolean; onPress: () => void }) {
   const t = useTheme();
   const s = e.session;
-  const other = s && s.agent !== codex;
+  const other = s && icon;
   const close = (session: SessionInfo) =>
     Alert.alert(e.title, "关闭这个会话？电脑上的 agent 会停止，对话记录还在电脑上。", [
       { text: "取消", style: "cancel" },

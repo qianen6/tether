@@ -132,7 +132,7 @@
 字段名一律 snake_case；可选字段缺省时省略或为 `null`，两种都要接受。
 
 ```text
-AgentInfo   { id, name, kind: "codex"|"claude"|"acp"|"terminal"|"echo",
+AgentInfo   { id, name, kind: "codex"|"claude"|"acp"|"dsh"|"terminal"|"echo",
               available: bool, detail?: string, chat: bool, terminal_command: string[] }
 
 SessionInfo { id, agent, title, cwd, state: SessionState, status_line?: string,
