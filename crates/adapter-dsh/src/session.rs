@@ -78,6 +78,7 @@ pub(crate) async fn run(
             _ = out.closed() => break None,
         }
     };
+    session.api.detach(&session.id);
     if error.is_some() {
         for approval in std::mem::take(&mut session.approvals).into_keys() {
             session.emit(EventKind::ApprovalDone {
@@ -102,14 +103,9 @@ impl Session {
             .map(str::to_owned);
         let id = match &opts.resume {
             Some(id) => {
-                // Reading a session attaches it in `dsh web` (a cold resume),
-                // after which its frames arrive on the mux.
-                api.call(
-                    "session.history",
-                    json!({ "sessionId": id, "maxMessages": 1 }),
-                )
-                .await
-                .with_context(|| format!("打开 DSH 会话 {id} 失败"))?;
+                api.attach(id)
+                    .await
+                    .with_context(|| format!("打开 DSH 会话 {id} 失败"))?;
                 id.clone()
             }
             None => {
@@ -121,11 +117,16 @@ impl Session {
                     .call("session.create", payload)
                     .await
                     .context("创建 DSH 会话失败")?;
-                created
+                let id = created
                     .get("sessionId")
                     .and_then(Value::as_str)
                     .context("DSH 没有返回会话 id")?
-                    .to_owned()
+                    .to_owned();
+                // 0.2 sends a session's frames only to those following it.
+                api.attach(&id)
+                    .await
+                    .with_context(|| format!("打开 DSH 会话 {id} 失败"))?;
+                id
             }
         };
         let _ = out.send(AgentOutput::NativeId(id.clone()));

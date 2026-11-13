@@ -6,8 +6,8 @@
 //! DSH sessions ([`hub`]), turns each Tether session into one DSH session
 //! ([`session`]) and its frames into Tether events ([`translate`]).
 //!
-//! Wire shapes were recorded from DSH 0.1.1-rc.2 (`fixtures/dsh/`); the
-//! 0.2 gateway (cookie auth, `session/prompt` names) is not spoken here.
+//! Wire shapes were recorded from DSH 0.1.1-rc.2 (`fixtures/dsh/`) and
+//! DSH 0.2.2-rc.1 (`fixtures/dsh/v2/`, spoken by [`v2`]).
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -28,15 +28,21 @@ mod discover;
 mod http;
 mod hub;
 mod job;
+mod location;
 mod session;
 mod setup;
 mod terminal;
 mod translate;
+mod v2;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_v2;
 
 pub use api::RpcError;
+pub use hub::{check_url, is_url, set_saved_url};
+pub use location::{Checked, check_launcher, launcher_at, set_saved_launcher};
 
 /// Set to the `dsh` launcher when it is neither on `PATH` nor found in the
 /// usual install folders.
@@ -55,6 +61,10 @@ pub struct DshAgent {
     pub name: String,
     /// The `dsh` launcher and any launcher flags (`--profile web` is implied).
     pub command: Vec<String>,
+    /// Found by Tether rather than configured: a launcher the person saved
+    /// ([`set_saved_launcher`]) wins, and a DSH installed since Tether
+    /// started is found, without a restart.
+    pub auto: bool,
 }
 
 impl DshAgent {
@@ -67,6 +77,7 @@ impl DshAgent {
             id: "dsh".into(),
             name: "DeepSeek Harness".into(),
             command: vec![program],
+            auto: true,
         }
     }
 }
@@ -84,16 +95,47 @@ pub fn adapter(agent: DshAgent) -> Arc<dyn AgentAdapter> {
 }
 
 impl DshAdapter {
-    fn program(&self) -> &str {
-        self.agent
-            .command
-            .first()
-            .map(String::as_str)
-            .unwrap_or("dsh")
+    /// The launcher (and flags) to use now.
+    fn command(&self) -> Vec<String> {
+        if self.agent.auto {
+            if let Some(saved) = location::saved_launcher() {
+                return vec![saved.display().to_string()];
+            }
+            // Nothing found when Tether started: look again.
+            let missing = self.agent.command.len() == 1
+                && self.agent.command[0] == "dsh"
+                && which::which("dsh").is_err();
+            if missing && let Some(found) = discover::locate(COMMAND_ENV) {
+                return vec![found];
+            }
+        }
+        self.agent.command.clone()
+    }
+
+    fn program(&self) -> String {
+        self.command()
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "dsh".into())
     }
 
     fn resolved(&self) -> Option<PathBuf> {
         which::which(self.program()).ok()
+    }
+
+    fn missing(&self) -> String {
+        if self.agent.auto
+            && let Some(saved) = location::saved_launcher()
+        {
+            return format!(
+                "填写的 DSH 位置 {} 已经不存在了：请在电脑端 Tether 里重新填写",
+                saved.display()
+            );
+        }
+        format!(
+            "未找到 DSH（命令 {}）：PATH 和常见安装目录里都没有。在电脑端 Tether 的 Agent 里填写 dsh.cmd 的位置，或设置环境变量 {COMMAND_ENV} 为它的完整路径",
+            self.program()
+        )
     }
 
     async fn api(hubs: &hub::Hubs, command: &[String]) -> anyhow::Result<Arc<dyn api::Api>> {
@@ -104,21 +146,16 @@ impl DshAdapter {
 impl AgentAdapter for DshAdapter {
     fn info(&self) -> AgentInfo {
         let resolved = self.resolved();
-        let url = std::env::var(URL_ENV).is_ok_and(|u| !u.trim().is_empty());
+        let url = hub::given_url().is_some();
         let available = resolved.is_some() || url;
         AgentInfo {
             id: self.agent.id.clone(),
             name: self.agent.name.clone(),
             kind: AgentKind::Dsh,
             available,
-            detail: (!available).then(|| {
-                format!(
-                    "未找到 DSH（命令 {}）：PATH 和常见安装目录里都没有。把 dsh 加进 PATH，或设置环境变量 {COMMAND_ENV} 为它的完整路径",
-                    self.program()
-                )
-            }),
+            detail: (!available).then(|| self.missing()),
             chat: true,
-            terminal_command: terminal::command(self.program(), resolved.as_deref()),
+            terminal_command: terminal::command(&self.program(), resolved.as_deref()),
         }
     }
 
@@ -130,7 +167,7 @@ impl AgentAdapter for DshAdapter {
         let runtime = tokio::runtime::Handle::try_current()?;
         let (tx, commands) = tokio::sync::mpsc::unbounded_channel();
         let hubs = self.hubs.clone();
-        let command = launch_command(&self.agent.command, opts.program.as_ref());
+        let command = launch_command(&self.command(), opts.program.as_ref());
         runtime.spawn(async move {
             match hubs.get(&command).await {
                 Ok(hub) => {
@@ -150,7 +187,7 @@ impl AgentAdapter for DshAdapter {
 
     fn list_history(&self, query: HistoryQuery) -> BoxFuture<HistoryData> {
         let hubs = self.hubs.clone();
-        let command = launch_command(&self.agent.command, query.program.as_ref());
+        let command = launch_command(&self.command(), query.program.as_ref());
         Box::pin(async move {
             let api = Self::api(&hubs, &command).await?;
             list_history(api.as_ref(), &query).await
@@ -159,7 +196,7 @@ impl AgentAdapter for DshAdapter {
 
     fn read_history(&self, read: HistoryRead) -> BoxFuture<HistoryReadData> {
         let hubs = self.hubs.clone();
-        let command = launch_command(&self.agent.command, read.program.as_ref());
+        let command = launch_command(&self.command(), read.program.as_ref());
         Box::pin(async move {
             let api = Self::api(&hubs, &command).await?;
             read_history(api.as_ref(), &read.thread).await
@@ -168,11 +205,13 @@ impl AgentAdapter for DshAdapter {
 
     fn list_models(&self, query: ModelQuery) -> BoxFuture<Vec<ModelInfo>> {
         let hubs = self.hubs.clone();
-        let command = launch_command(&self.agent.command, query.program.as_ref());
+        let command = launch_command(&self.command(), query.program.as_ref());
         Box::pin(async move {
-            let hub = hubs.get(&command).await?;
-            let current = hub::describe(&hub.origin).await.unwrap_or(Value::Null);
-            let api = hub.api();
+            let api = hubs.get(&command).await?.api();
+            let current = api
+                .call("host.describe", json!({}))
+                .await
+                .unwrap_or(Value::Null);
             let models = models_from(&api.call("llm.models", json!({})).await?, &current);
             let mut providers: Vec<String> = models
                 .iter()

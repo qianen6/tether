@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use backend::{DeviceView, HostState, PairView, StatusView};
+use backend::{CheckView, DeviceView, HostState, LocationView, PairView, StatusView};
 use settings::PowerState;
 use tauri::{
     Emitter, Manager, State,
@@ -65,6 +65,46 @@ async fn agents(host: State<'_, HostState>) -> Result<Vec<AgentInfo>, String> {
 #[tauri::command]
 async fn status(host: State<'_, HostState>) -> Result<StatusView, String> {
     host.status().await.map_err(command_error)
+}
+
+/// The agents whose program can be chosen, with the chosen one (if any).
+#[tauri::command]
+async fn locations(host: State<'_, HostState>) -> Result<Vec<LocationView>, String> {
+    host.locations().await.map_err(command_error)
+}
+
+/// Checks the program at `path` (a file or its folder) for `agent` — right
+/// name, runs `--version` — then uses it at once and keeps it. Nothing is
+/// saved when the check fails.
+#[tauri::command]
+async fn set_location(
+    host: State<'_, HostState>,
+    agent: String,
+    path: String,
+) -> Result<CheckView, String> {
+    host.set_location(&agent, &path)
+        .await
+        .map_err(command_error)
+}
+
+/// Forgets `agent`'s chosen program: Tether looks for it by itself again.
+#[tauri::command]
+async fn clear_location(host: State<'_, HostState>, agent: String) -> Result<(), String> {
+    host.clear_location(&agent).await.map_err(command_error)
+}
+
+/// A DSH location typed in by an earlier version (kept in the desktop
+/// settings) moves to the Host, which now keeps every agent's location.
+async fn move_old_dsh_location(host: &HostState, power: &PowerState) {
+    let Some(path) = power.dsh_path().await else {
+        return;
+    };
+    if let Err(error) = host.set_location("dsh", &path).await {
+        tracing::warn!(%error, path, "earlier DSH location no longer checks out");
+    }
+    if let Err(error) = power.set_dsh_path(None).await {
+        tracing::warn!(%error, "forget earlier DSH location");
+    }
 }
 
 #[tauri::command]
@@ -219,7 +259,10 @@ pub fn run() -> Result<()> {
             agents,
             status,
             get_keep_awake,
-            set_keep_awake
+            set_keep_awake,
+            locations,
+            set_location,
+            clear_location
         ])
         .setup(|app| {
             let power = PowerState::load(app.path().app_data_dir()?.join("desktop-settings.json"))?;
@@ -234,6 +277,7 @@ pub fn run() -> Result<()> {
                 let _ = tauri::async_runtime::block_on(host.shutdown());
                 return Err(error.into());
             }
+            tauri::async_runtime::block_on(move_old_dsh_location(&host, &power));
             app.manage(host);
             app.manage(power);
             if let Err(error) = install_tray(app) {

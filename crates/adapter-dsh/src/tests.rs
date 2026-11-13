@@ -730,7 +730,9 @@ fn models_and_permissions() {
 
 /// Against a real `dsh web`: `TETHER_DSH_URL=http://127.0.0.1:PORT cargo test
 /// -p tether-adapter-dsh -- --ignored live`. Sends one message, so the
-/// `dsh web` should run a cheap or scripted model.
+/// `dsh web` should run a cheap or scripted model (`TETHER_DSH_LIVE_MODEL`
+/// picks one, as `provider/model`). DSH 0.2 needs the whole URL it printed,
+/// `?token=…` included.
 #[tokio::test]
 #[ignore = "needs a running dsh web (TETHER_DSH_URL)"]
 async fn live_round_trip() {
@@ -751,6 +753,7 @@ async fn live_round_trip() {
         adapter.as_ref(),
         SpawnOptions {
             cwd: dir.path().to_path_buf(),
+            model: std::env::var("TETHER_DSH_LIVE_MODEL").ok(),
             ..Default::default()
         },
     )
@@ -766,28 +769,45 @@ async fn live_round_trip() {
         images: vec![],
     })
     .unwrap();
+    // Approvals are allowed once; a question is answered with its first
+    // option, the way a reply typed on the phone would.
+    enum Next {
+        Approve(String),
+        Reply,
+        Done,
+    }
     loop {
-        let approval = d
+        let next = d
             .wait_for(
                 |o| match o {
                     AgentOutput::Event(EventKind::Approval { approval }) => {
-                        Some(Some(approval.id.clone()))
+                        Some(Next::Approve(approval.id.clone()))
                     }
-                    AgentOutput::Event(EventKind::TurnDone { .. }) => Some(None),
+                    AgentOutput::Event(EventKind::State {
+                        state: SessionState::NeedsYou,
+                        status_line: Some(_),
+                    }) => Some(Next::Reply),
+                    AgentOutput::Event(EventKind::TurnDone { .. }) => Some(Next::Done),
                     _ => None,
                 },
                 Duration::from_secs(120),
             )
             .await
             .unwrap();
-        match approval {
-            Some(id) => d
+        match next {
+            Next::Approve(id) => d
                 .send(AgentCommand::Answer {
                     approval: id,
                     decision: Decision::AllowOnce,
                 })
                 .unwrap(),
-            None => break,
+            Next::Reply => d
+                .send(AgentCommand::Send {
+                    text: "1".into(),
+                    images: vec![],
+                })
+                .unwrap(),
+            Next::Done => break,
         }
     }
     for o in &d.outputs {
@@ -936,4 +956,49 @@ fn missing_credential_turns() {
         "{text}"
     );
     assert!(text.contains("dsh web"));
+}
+
+#[test]
+fn a_saved_launcher_applies_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let launcher = dir
+        .path()
+        .join(if cfg!(windows) { "dsh.cmd" } else { "dsh" });
+    std::fs::write(&launcher, "").unwrap();
+    let agent = crate::adapter(crate::DshAgent {
+        id: "dsh".into(),
+        name: "DeepSeek Harness".into(),
+        command: vec!["tether-no-such-dsh-xyz".into()],
+        auto: true,
+    });
+    assert!(!agent.info().available);
+    crate::set_saved_launcher(Some(launcher.clone()));
+    let info = agent.info();
+    crate::set_saved_launcher(Some(dir.path().join("gone").join("dsh.cmd")));
+    let gone = agent.info();
+    crate::set_saved_launcher(None);
+    #[cfg(windows)]
+    assert!(info.available, "{info:?}");
+    assert!(!info.terminal_command.is_empty());
+    assert!(!gone.available);
+    assert!(gone.detail.unwrap().contains("已经不存在"));
+    assert!(agent.info().detail.unwrap().contains("填写 dsh.cmd 的位置"));
+}
+
+/// Checks a pasted address the way the desktop app does:
+/// `TETHER_DSH_URL=<dsh web URL> cargo test -p tether-adapter-dsh --
+/// --ignored live_check_url`. Opens no session.
+#[tokio::test]
+#[ignore = "needs a running dsh web in TETHER_DSH_URL"]
+async fn live_check_url() {
+    let url = std::env::var(crate::URL_ENV).expect("set TETHER_DSH_URL");
+    let line = format!("dsh web: {url}");
+    assert_eq!(crate::check_url(&line).await.unwrap(), url);
+    let wrong = match url.split_once("token=") {
+        Some((head, _)) => format!("{head}token=wrong"),
+        None => return,
+    };
+    let error = format!("{:#}", crate::check_url(&wrong).await.unwrap_err());
+    eprintln!("{error}");
+    assert!(error.contains("没有接受"), "{error}");
 }

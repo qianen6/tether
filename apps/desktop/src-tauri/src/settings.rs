@@ -11,6 +11,9 @@ use crate::awake::AwakeController;
 struct Preferences {
     autostart_initialized: bool,
     keep_awake: bool,
+    /// A DSH launcher typed in by an earlier version; moved to the Host
+    /// (which keeps every agent's location) on start, then cleared.
+    dsh_path: Option<String>,
 }
 
 impl Preferences {
@@ -86,6 +89,19 @@ impl PowerState {
         Ok(self.keep_awake())
     }
 
+    pub async fn dsh_path(&self) -> Option<String> {
+        self.preferences.lock().await.dsh_path.clone()
+    }
+
+    pub async fn set_dsh_path(&self, path: Option<String>) -> Result<()> {
+        let mut preferences = self.preferences.lock().await;
+        let mut next = preferences.clone();
+        next.dsh_path = path;
+        next.save(&self.path)?;
+        *preferences = next;
+        Ok(())
+    }
+
     pub fn shutdown(&self) {
         self.awake.shutdown();
     }
@@ -126,6 +142,24 @@ mod tests {
             let _ = std::fs::remove_dir(self.settings());
             let _ = std::fs::remove_dir(&self.0);
         }
+    }
+
+    #[tokio::test]
+    async fn the_dsh_location_is_kept() {
+        let temp = TestPath::new();
+        let power = temp.power();
+        assert_eq!(power.dsh_path().await, None);
+        power
+            .set_dsh_path(Some(r"D:\DSH\dsh.cmd".into()))
+            .await
+            .unwrap();
+        let saved = Preferences::load(&temp.settings()).unwrap();
+        assert_eq!(saved.dsh_path.as_deref(), Some(r"D:\DSH\dsh.cmd"));
+        power.set_dsh_path(None).await.unwrap();
+        assert_eq!(Preferences::load(&temp.settings()).unwrap().dsh_path, None);
+        // Settings from before there was a DSH location still load.
+        std::fs::write(temp.settings(), br#"{"keep_awake":true}"#).unwrap();
+        assert_eq!(Preferences::load(&temp.settings()).unwrap().dsh_path, None);
     }
 
     #[test]

@@ -16,6 +16,7 @@ function fakeApi() {
     { id: "pixel", name: "Pixel 9", paired_at: 1_730_000_000_000, last_seen: 1_730_000_060_000 },
     { id: "iphone", name: "iPhone", paired_at: 1_730_000_000_000, last_seen: null },
   ];
+  const chosen = new Map<string, string>();
   let onPair: (pair: PairInfo) => void = () => {};
   let onError: (message: string) => void = () => {};
   const offPair = vi.fn();
@@ -27,13 +28,22 @@ function fakeApi() {
     revoke: vi.fn(async (id: string) => { devices = devices.filter((device) => device.id !== id); }),
     agents: vi.fn(async () => [
       { id: "codex", name: "Codex", kind: "codex" as const, available: true, chat: true, terminal_command: ["codex"] },
-      { id: "claude", name: "Claude Agent", kind: "claude" as const, available: false, detail: "未找到 claude 命令", chat: true, terminal_command: ["claude"] },
+      { id: "claude", name: "Claude Agent", kind: "claude" as const, available: chosen.has("claude"), detail: chosen.has("claude") ? null : "未找到 claude 命令", chat: true, terminal_command: [chosen.get("claude") ?? "claude"] },
+      { id: "dsh", name: "DeepSeek Harness", kind: "dsh" as const, available: chosen.has("dsh"), detail: chosen.has("dsh") ? null : "未找到 DSH", chat: true, terminal_command: ["dsh"] },
     ]),
     status: vi.fn(async () => ({ tunnel_address: "fake.local", gateway: "127.0.0.1:43123", connected_devices: devices.length, sessions_working: 1, sessions_need_you: 2, fake_host: true })),
     keepAwake: vi.fn(async () => false),
     setKeepAwake: vi.fn(async (enabled: boolean) => enabled),
     autostart: vi.fn(async () => true),
     setAutostart: vi.fn(async (enabled: boolean) => enabled),
+    locations: vi.fn(async () => ["codex", "claude", "dsh"].map((agent) => ({ agent, program: chosen.get(agent) ?? null }))),
+    setLocation: vi.fn(async (agent: string, path: string) => {
+      const file = path.split("\\").pop() ?? "";
+      if (!file.startsWith(agent)) throw `${file} 看起来不是 ${agent}`;
+      chosen.set(agent, path);
+      return { program: path, version: agent === "dsh" ? "0.1.1-rc.2" : "2.1.0 (Claude Code)" };
+    }),
+    clearLocation: vi.fn(async (agent: string) => { chosen.delete(agent); }),
     onPairing: vi.fn(async (handler: (pair: PairInfo) => void) => { onPair = handler; return offPair; }),
     onError: vi.fn(async (handler: (message: string) => void) => { onError = handler; return offError; }),
   } satisfies DesktopApi;
@@ -44,6 +54,34 @@ beforeEach(() => qrDataUrl.mockResolvedValue(imageUrl));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 
 describe("desktop shell", () => {
+  it("checks a program location before keeping it, for any agent", async () => {
+    const { api } = fakeApi();
+    render(<App api={api} />);
+    // Every agent the Host lists gets a chooser; missing ones say 选择, found ones 更改.
+    expect(await screen.findByRole("button", { name: "更改 Codex 的位置" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "选择 DeepSeek Harness 的位置" }));
+    const dsh = screen.getByLabelText(/^DeepSeek Harness 程序的完整路径，或它所在的文件夹；也可以填已经在运行的 dsh web/);
+    fireEvent.change(dsh, { target: { value: "D:\\DSH\\node.exe" } });
+    fireEvent.click(screen.getByRole("button", { name: "检查并保存" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("看起来不是 dsh");
+    fireEvent.change(dsh, { target: { value: "D:\\DSH\\dsh.cmd" } });
+    fireEvent.click(screen.getByRole("button", { name: "检查并保存" }));
+    expect((await screen.findByText(/已找到 0\.1\.1-rc\.2/)).textContent).toContain("之后都用这个位置");
+    expect(api.setLocation).toHaveBeenLastCalledWith("dsh", "D:\\DSH\\dsh.cmd");
+    expect(await screen.findByText("使用选择的位置：D:\\DSH\\dsh.cmd")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "选择 Claude Agent 的位置" }));
+    fireEvent.change(screen.getByLabelText("Claude Agent 程序的完整路径，或它所在的文件夹"), { target: { value: "E:\\tools\\claude.exe" } });
+    fireEvent.click(screen.getByRole("button", { name: "检查并保存" }));
+    expect(await screen.findByText("使用选择的位置：E:\\tools\\claude.exe")).toBeTruthy();
+    expect(api.setLocation).toHaveBeenLastCalledWith("claude", "E:\\tools\\claude.exe");
+
+    fireEvent.click(screen.getByRole("button", { name: "DeepSeek Harness 改回自动查找" }));
+    await waitFor(() => expect(api.clearLocation).toHaveBeenCalledWith("dsh"));
+    expect(await screen.findByRole("button", { name: "选择 DeepSeek Harness 的位置" })).toBeTruthy();
+    expect(screen.getByText("使用选择的位置：E:\\tools\\claude.exe")).toBeTruthy();
+  });
+
   it("shows host status, device timestamps and agent availability", async () => {
     const { api } = fakeApi();
     render(<App api={api} />);

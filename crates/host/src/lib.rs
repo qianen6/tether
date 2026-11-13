@@ -5,6 +5,7 @@ mod agents;
 mod codex_desktop;
 mod config;
 mod link;
+mod locations;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
@@ -22,6 +23,8 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use link::TunnelBackend;
+use locations::Locations;
+pub use locations::ProgramCheck;
 
 #[derive(Debug, Clone, Default)]
 pub struct HostConfig {
@@ -60,6 +63,14 @@ pub struct PairInfo {
     pub expires_at: u64,
 }
 
+/// An agent whose program can be chosen, and the one chosen (none: found by
+/// Tether).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgentLocation {
+    pub agent: String,
+    pub program: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct HostStatus {
     pub tunnel_address: Option<String>,
@@ -91,6 +102,7 @@ pub struct Host {
     server: Option<Server>,
     gateway: SocketAddr,
     agents: Vec<Arc<dyn AgentAdapter>>,
+    locations: Arc<Locations>,
     tunnel: Option<Arc<dyn TunnelBackend>>,
     joined: Option<mpsc::UnboundedSender<link::Joined>>,
     linker: Option<JoinHandle<()>>,
@@ -149,7 +161,12 @@ impl Host {
         let mut custom = config::load_agents(&dir)?;
         custom.extend(cfg.custom_agents.iter().cloned());
         let echo = std::env::var(agents::ECHO_ENV).is_ok_and(|v| v == "1");
-        let agents = agents::discover(&custom, echo);
+        // Each agent takes the program chosen for it on the desktop, if any.
+        let locations = Arc::new(Locations::load(&dir));
+        let agents: Vec<_> = agents::discover(&custom, echo)
+            .into_iter()
+            .map(|a| locations::locate(a, &locations))
+            .collect();
 
         let store = Arc::new(Store::open(&dir.join(config::DATABASE_FILE))?);
         let terms = Arc::new(TermManager::new(DEFAULT_SCROLLBACK));
@@ -178,6 +195,7 @@ impl Host {
             server: Some(server),
             gateway,
             agents,
+            locations,
             tunnel,
             joined: None,
             linker: None,
@@ -266,6 +284,44 @@ impl Host {
 
     pub fn agents(&self) -> Vec<AgentInfo> {
         self.agents.iter().map(|a| a.info()).collect()
+    }
+
+    /// The agents whose program can be chosen, in display order, with the
+    /// program chosen for each.
+    pub fn locations(&self) -> Vec<AgentLocation> {
+        let all = self.locations.all();
+        self.agents
+            .iter()
+            .map(|a| a.info().id)
+            .filter_map(|id| {
+                let (_, program) = all.iter().find(|(a, _)| *a == id)?;
+                Some(AgentLocation {
+                    agent: id,
+                    program: program.clone(),
+                })
+            })
+            .collect()
+    }
+
+    /// Checks `path` (the program, or its folder) as `agent`'s program by
+    /// running `--version`, then uses it from now on. Nothing changes when
+    /// the check fails; the error says why in words for the person.
+    ///
+    /// The returned future does not borrow the Host, so a caller holding it
+    /// behind a lock can let go while the program runs.
+    pub fn set_location(
+        &self,
+        agent: &str,
+        path: &str,
+    ) -> impl std::future::Future<Output = anyhow::Result<ProgramCheck>> + Send + 'static {
+        let locations = self.locations.clone();
+        let (agent, path) = (agent.to_owned(), path.to_owned());
+        async move { locations.set(&agent, &path).await }
+    }
+
+    /// Forgets `agent`'s chosen program: Tether finds it by itself again.
+    pub fn clear_location(&self, agent: &str) -> anyhow::Result<()> {
+        self.locations.clear(agent)
     }
 
     pub fn status(&self) -> HostStatus {

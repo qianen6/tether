@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -30,46 +30,155 @@ pub(crate) async fn post_json(
     body: &Value,
     timeout: Duration,
 ) -> Result<Value> {
+    post_json_with(origin, path, body, timeout, None).await
+}
+
+/// [`post_json`] carrying a `Cookie` header (DSH 0.2 authenticates with one).
+pub(crate) async fn post_json_with(
+    origin: &str,
+    path: &str,
+    body: &Value,
+    timeout: Duration,
+    cookie: Option<&str>,
+) -> Result<Value> {
     let authority = authority(origin)?;
     let work = async {
         let stream = TcpStream::connect(authority)
             .await
             .with_context(|| format!("连接 DSH {origin} 失败"))?;
-        exchange(stream, authority, path, body).await
+        exchange_with(stream, authority, path, body, cookie).await
     };
     tokio::time::timeout(timeout, work)
         .await
         .with_context(|| format!("DSH {path} 超时（{}s）", timeout.as_secs()))?
 }
 
+/// An HTTP status other than 200 that DSH answered with.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct HttpStatus {
+    pub status: u16,
+    pub path: String,
+    pub body: String,
+}
+
+impl std::fmt::Display for HttpStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DSH {} 返回 HTTP {}：{}",
+            self.path,
+            self.status,
+            self.body.trim()
+        )
+    }
+}
+
+impl std::error::Error for HttpStatus {}
+
+/// The HTTP status inside `error`, if DSH answered with one.
+pub(crate) fn status_of(error: &anyhow::Error) -> Option<u16> {
+    error
+        .chain()
+        .find_map(|e| e.downcast_ref::<HttpStatus>().map(|s| s.status))
+}
+
 /// Write one request on `stream` and read the whole response.
+#[cfg(test)]
 pub(crate) async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
-    mut stream: S,
+    stream: S,
     authority: &str,
     path: &str,
     body: &Value,
 ) -> Result<Value> {
+    exchange_with(stream, authority, path, body, None).await
+}
+
+async fn exchange_with<S: AsyncRead + AsyncWrite + Unpin>(
+    mut stream: S,
+    authority: &str,
+    path: &str,
+    body: &Value,
+    cookie: Option<&str>,
+) -> Result<Value> {
     let body = serde_json::to_vec(body)?;
+    let cookie = cookie
+        .map(|c| format!("Cookie: {c}\r\n"))
+        .unwrap_or_default();
     let head = format!(
         "POST {path} HTTP/1.1\r\nHost: {authority}\r\nContent-Type: application/json\r\n\
-         Content-Length: {}\r\nConnection: close\r\n\r\n",
+         {cookie}Content-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(head.as_bytes()).await?;
     stream.write_all(&body).await?;
     stream.flush().await?;
+    let raw = read_all(&mut stream).await?;
+    let (status, body) = parse_response(&raw)?;
+    let text = String::from_utf8_lossy(&body);
+    if status != 200 {
+        return Err(HttpStatus {
+            status,
+            path: path.to_owned(),
+            body: text.into_owned(),
+        }
+        .into());
+    }
+    serde_json::from_str(&text).with_context(|| format!("DSH {path} 的回应不是 JSON"))
+}
+
+async fn read_all<S: AsyncRead + Unpin>(stream: &mut S) -> Result<Vec<u8>> {
     let mut raw = Vec::new();
-    (&mut stream)
+    stream
         .take(MAX_RESPONSE as u64 + 1)
         .read_to_end(&mut raw)
         .await?;
     ensure!(raw.len() <= MAX_RESPONSE, "DSH 的回应太大");
-    let (status, body) = parse_response(&raw)?;
-    let text = String::from_utf8_lossy(&body);
-    if status != 200 {
-        bail!("DSH {path} 返回 HTTP {status}：{}", text.trim());
-    }
-    serde_json::from_str(&text).with_context(|| format!("DSH {path} 的回应不是 JSON"))
+    Ok(raw)
+}
+
+/// `GET path`: the status and the `Set-Cookie` pairs (`name=value`).
+pub(crate) async fn get_cookies(
+    origin: &str,
+    path: &str,
+    timeout: Duration,
+) -> Result<(u16, Vec<String>)> {
+    let authority = authority(origin)?;
+    let work = async {
+        let stream = TcpStream::connect(authority)
+            .await
+            .with_context(|| format!("连接 DSH {origin} 失败"))?;
+        get_cookies_on(stream, authority, path).await
+    };
+    tokio::time::timeout(timeout, work)
+        .await
+        .with_context(|| format!("连接 DSH {origin} 超时（{}s）", timeout.as_secs()))?
+}
+
+pub(crate) async fn get_cookies_on<S: AsyncRead + AsyncWrite + Unpin>(
+    mut stream: S,
+    authority: &str,
+    path: &str,
+) -> Result<(u16, Vec<String>)> {
+    let head = format!("GET {path} HTTP/1.1\r\nHost: {authority}\r\nConnection: close\r\n\r\n");
+    stream.write_all(head.as_bytes()).await?;
+    stream.flush().await?;
+    let raw = read_all(&mut stream).await?;
+    let split = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .context("DSH 的 HTTP 回应不完整")?;
+    let head = std::str::from_utf8(&raw[..split]).context("DSH 的 HTTP 头不是 UTF-8")?;
+    let (status, _) = parse_response(&raw)?;
+    let cookies = head
+        .split("\r\n")
+        .skip(1)
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(name, _)| name.trim().eq_ignore_ascii_case("set-cookie"))
+        .filter_map(|(_, value)| value.split(';').next())
+        .map(|pair| pair.trim().to_owned())
+        .filter(|pair| pair.contains('='))
+        .collect();
+    Ok((status, cookies))
 }
 
 /// Status code and decoded body.
@@ -165,6 +274,53 @@ mod tests {
         );
         assert!(authority("https://x").is_err());
         assert!(authority("http://x/api").is_err());
+    }
+
+    #[tokio::test]
+    async fn cookies_and_statuses() {
+        let (client, mut server) = tokio::io::duplex(4096);
+        let serve = tokio::spawn(async move {
+            let mut buf = vec![0u8; 1024];
+            let n = server.read(&mut buf).await.unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]).into_owned();
+            assert!(text.starts_with("GET /connect?token=t&interactions=answer HTTP/1.1\r\n"));
+            server
+                .write_all(
+                    b"HTTP/1.1 302 Found\r\nlocation: ./api/remote.mux\r\n\
+                      set-cookie: dsh-auth-x=v2.abc; Max-Age=1; Path=/; HttpOnly\r\n\
+                      Transfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
+                )
+                .await
+                .unwrap();
+        });
+        let (status, cookies) = get_cookies_on(
+            client,
+            "127.0.0.1:9",
+            "/connect?token=t&interactions=answer",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (status, cookies),
+            (302, vec!["dsh-auth-x=v2.abc".to_owned()])
+        );
+        serve.await.unwrap();
+
+        let (client, mut server) = tokio::io::duplex(4096);
+        tokio::spawn(async move {
+            let mut buf = vec![0u8; 4096];
+            let n = server.read(&mut buf).await.unwrap();
+            let text = String::from_utf8_lossy(&buf[..n]).into_owned();
+            assert!(text.contains("Cookie: a=b\r\n"), "{text}");
+            server
+                .write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 12\r\n\r\nunauthorized")
+                .await
+                .unwrap();
+        });
+        let error = exchange_with(client, "h", "/api/session/list", &json!({}), Some("a=b"))
+            .await
+            .unwrap_err();
+        assert_eq!(status_of(&error), Some(401));
     }
 
     #[tokio::test]

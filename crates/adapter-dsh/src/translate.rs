@@ -308,7 +308,10 @@ impl Translator {
         if self.hidden.remove(&id) {
             return Vec::new();
         }
-        let mut ok = result.get("isError").and_then(Value::as_bool) != Some(true);
+        // 0.1 wraps the result in a `tool-result` part; 0.2 puts `isError`
+        // and the text parts on the message itself.
+        let holder = if result.is_null() { &message } else { &result };
+        let mut ok = holder.get("isError").and_then(Value::as_bool) != Some(true);
         let card = view.and_then(|v| v.get("view"));
         let output = match card.filter(|c| str_at(c, &["card"]) == Some("terminal")) {
             Some(card) => {
@@ -317,7 +320,7 @@ impl Translator {
                 }
                 str_at(card, &["output"]).unwrap_or_default().to_owned()
             }
-            None => text_of(result.get("content")),
+            None => text_of(holder.get("content")),
         };
         vec![EventKind::ToolEnd {
             item: id,
