@@ -1,7 +1,76 @@
 import { useEffect, useRef, useState } from "react";
-import { desktopApi, type AgentInfo, type DesktopApi, type DeviceInfo, type HostStatus, type PairInfo } from "./api";
+import { desktopApi, type AgentInfo, type AgentLocation, type DesktopApi, type DeviceInfo, type HostStatus, type PairInfo } from "./api";
 import { Pairing } from "./Pairing";
 import "./style.css";
+
+/** An example of what to type for `agent`, as it is usually installed on Windows. */
+function example(agent: AgentInfo): string {
+  if (agent.kind === "dsh") return "C:\\Tools\\DeepSeekHarness\\node-v24.19.0-win-x64\\dsh.cmd";
+  if (agent.kind === "terminal") return "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
+  const program = agent.terminal_command[0] ?? agent.id;
+  const name = program.split(/[\\/]/).pop()?.replace(/\.(cmd|exe|bat)$/i, "") || agent.id;
+  return `C:\\Users\\你\\AppData\\Roaming\\npm\\${name}.cmd`;
+}
+
+/**
+ * Where an agent's program is, for when Tether cannot find it (installed outside PATH and the
+ * usual folders) or should use another one: the program or its folder is typed in, checked on
+ * the computer (right name, runs `--version`), and kept only when the check passes.
+ * "改回自动查找" forgets it.
+ */
+function ProgramLocation({ api, agent, saved, onChanged }: { api: DesktopApi; agent: AgentInfo; saved: string | null; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [found, setFound] = useState<string | null>(null);
+  const field = `location-${agent.id}`;
+  const change = Boolean(saved) || agent.available;
+
+  async function check() {
+    setBusy(true); setError(null); setFound(null);
+    try {
+      const result = await api.setLocation(agent.id, text);
+      setEditing(false);
+      setFound(result.version ? `已找到 ${result.version}，之后都用这个位置。` : "检查通过，之后都用这个位置。");
+      onChanged();
+    } catch (reason) { setError(String(reason)); }
+    finally { setBusy(false); }
+  }
+
+  async function clear() {
+    setBusy(true); setError(null); setFound(null);
+    try { await api.clearLocation(agent.id); onChanged(); }
+    catch (reason) { setError(String(reason)); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="locate">
+    {saved && !editing && <p className="meta">使用选择的位置：{saved}</p>}
+    {found && <p role="status" className="found">{found}</p>}
+    {editing ? <form onSubmit={(event) => { event.preventDefault(); void check(); }}>
+      <label htmlFor={field} className="meta">{agent.name} 程序的完整路径，或它所在的文件夹{agent.kind === "dsh" ? "；也可以填已经在运行的 dsh web 打印的地址" : ""}</label>
+      <input id={field} value={text} spellCheck={false} autoFocus disabled={busy}
+        placeholder={example(agent)}
+        onChange={(event) => setText(event.currentTarget.value)} />
+      <p className="meta">在资源管理器里按住 Shift 右键程序文件，选“复制为路径”，粘贴到这里。</p>
+      {agent.kind === "dsh" && <p className="meta">要连接已经开着的 DSH：把 dsh web 启动时打印的那一行（dsh web: http://127.0.0.1:端口/?token=…）整行粘贴进来。DSH 重启后 token 会变，到时 Tether 会自己启动 DSH，需要的话再重新填写。</p>}
+      {error && <p role="alert" className="alert">{error}</p>}
+      <div className="actions">
+        <button type="submit" className="primary" disabled={busy || !text.trim()}>{busy ? "正在检查…" : "检查并保存"}</button>
+        <button type="button" disabled={busy} onClick={() => { setEditing(false); setError(null); }}>取消</button>
+      </div>
+    </form> : <div className="actions">
+      <button type="button" className={change ? "ghost" : undefined} disabled={busy}
+        aria-label={`${change ? "更改" : "选择"} ${agent.name} 的位置`}
+        onClick={() => { setEditing(true); setFound(null); setText(saved ?? ""); }}>
+        {change ? "更改位置" : "选择位置"}
+      </button>
+      {saved && <button type="button" className="ghost" disabled={busy} aria-label={`${agent.name} 改回自动查找`} onClick={() => void clear()}>改回自动查找</button>}
+      {error && <p role="alert" className="alert">{error}</p>}
+    </div>}
+  </div>;
+}
 
 function formatTime(value: number | null): string {
   return value === null ? "从未上线" : new Date(value).toLocaleString();
@@ -11,6 +80,7 @@ export function App({ api = desktopApi }: { api?: DesktopApi }) {
   const [status, setStatus] = useState<HostStatus | null>(null);
   const [devices, setDevices] = useState<DeviceInfo[] | null>(null);
   const [agents, setAgents] = useState<AgentInfo[] | null>(null);
+  const [locations, setLocations] = useState<AgentLocation[]>([]);
   const [pair, setPair] = useState<PairInfo | null>(null);
   const [pairing, setPairing] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
@@ -33,9 +103,9 @@ export function App({ api = desktopApi }: { api?: DesktopApi }) {
       if (busy) return;
       busy = true;
       try {
-        const [nextStatus, nextDevices, nextAgents] = await Promise.all([api.status(), api.devices(), api.agents()]);
+        const [nextStatus, nextDevices, nextAgents, nextLocations] = await Promise.all([api.status(), api.devices(), api.agents(), api.locations()]);
         if (!cancelled) {
-          setStatus(nextStatus); setDevices(nextDevices); setAgents(nextAgents); setOverviewError(null);
+          setStatus(nextStatus); setDevices(nextDevices); setAgents(nextAgents); setLocations(nextLocations); setOverviewError(null);
         }
       } catch (reason) {
         if (!cancelled) setOverviewError(`读取 Host 失败：${String(reason)}`);
@@ -191,6 +261,7 @@ export function App({ api = desktopApi }: { api?: DesktopApi }) {
             <div className="grow">
               <strong>{agent.name}</strong>
               {!agent.available && <p className="meta">{agent.detail || "未提供原因"}</p>}
+              {locations.filter((l) => l.agent === agent.id).map((l) => <ProgramLocation key={l.agent} api={api} agent={agent} saved={l.program} onChanged={() => setRefresh((value) => value + 1)} />)}
             </div>
             <span className={`tag ${agent.available ? "ok" : "off"}`}>{agent.available ? "可用" : "不可用"}</span>
           </li>)}

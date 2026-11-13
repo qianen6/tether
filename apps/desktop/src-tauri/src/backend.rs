@@ -61,6 +61,21 @@ impl From<HostStatus> for StatusView {
     }
 }
 
+/// An agent whose program can be chosen, and the one chosen (if any).
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct LocationView {
+    pub agent: String,
+    pub program: Option<String>,
+}
+
+/// A chosen program that passed its check.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct CheckView {
+    pub program: String,
+    /// What `--version` printed; shells are not asked.
+    pub version: Option<String>,
+}
+
 struct Inner {
     host: Option<Host>,
     pairing: Option<PairView>,
@@ -125,6 +140,34 @@ impl HostState {
         Ok(active(&*self.inner.lock().await)?.agents())
     }
 
+    pub async fn locations(&self) -> Result<Vec<LocationView>> {
+        let inner = self.inner.lock().await;
+        Ok(active(&inner)?
+            .locations()
+            .into_iter()
+            .map(|l| LocationView {
+                agent: l.agent,
+                program: l.program.map(|p| p.display().to_string()),
+            })
+            .collect())
+    }
+
+    /// Checks the program at `path` (a file or its folder) for `agent`, and
+    /// uses it from now on. Nothing changes when the check fails.
+    pub async fn set_location(&self, agent: &str, path: &str) -> Result<CheckView> {
+        // Not under the lock: the check runs the program, which may take seconds.
+        let check = active(&*self.inner.lock().await)?.set_location(agent, path);
+        let checked = check.await?;
+        Ok(CheckView {
+            program: checked.program.display().to_string(),
+            version: checked.version,
+        })
+    }
+
+    pub async fn clear_location(&self, agent: &str) -> Result<()> {
+        active(&*self.inner.lock().await)?.clear_location(agent)
+    }
+
     pub async fn status(&self) -> Result<StatusView> {
         Ok(active(&*self.inner.lock().await)?.status().into())
     }
@@ -152,15 +195,19 @@ pub fn tray_text(status: &StatusView) -> String {
 
 #[cfg(feature = "fake-host")]
 mod fake {
+    use std::collections::BTreeMap;
     use std::net::{Ipv4Addr, SocketAddr};
-    use std::sync::Mutex;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
 
+    use tether_host::{AgentLocation, ProgramCheck};
     use tether_proto::AgentKind;
 
     use super::*;
 
     pub struct Host {
         devices: Mutex<Vec<DeviceView>>,
+        chosen: Arc<Mutex<BTreeMap<String, PathBuf>>>,
     }
 
     impl Host {
@@ -180,6 +227,7 @@ mod fake {
                         last_seen: None,
                     },
                 ]),
+                chosen: Arc::default(),
             })
         }
 
@@ -236,6 +284,50 @@ mod fake {
                     terminal_command: vec!["shell".into()],
                 },
             ]
+        }
+
+        pub fn locations(&self) -> Vec<AgentLocation> {
+            let chosen = self.chosen.lock().map(|c| c.clone()).unwrap_or_default();
+            ["codex", "claude", "terminal"]
+                .into_iter()
+                .map(|agent| AgentLocation {
+                    agent: agent.into(),
+                    program: chosen.get(agent).cloned(),
+                })
+                .collect()
+        }
+
+        /// Accepts any `.exe` / `.cmd` path without running it (演示).
+        pub fn set_location(
+            &self,
+            agent: &str,
+            path: &str,
+        ) -> impl std::future::Future<Output = Result<ProgramCheck>> + Send + 'static {
+            let chosen = self.chosen.clone();
+            let (agent, path) = (agent.to_owned(), path.trim().to_owned());
+            async move {
+                let lower = path.to_ascii_lowercase();
+                if !(lower.ends_with(".exe") || lower.ends_with(".cmd")) {
+                    return Err(anyhow!("{path} 不是可以运行的程序（演示）"));
+                }
+                let program = PathBuf::from(&path);
+                chosen
+                    .lock()
+                    .map_err(|_| anyhow!("fake Host location lock poisoned"))?
+                    .insert(agent.clone(), program.clone());
+                Ok(ProgramCheck {
+                    program,
+                    version: (agent != "terminal").then(|| "1.0.0（演示）".into()),
+                })
+            }
+        }
+
+        pub fn clear_location(&self, agent: &str) -> Result<()> {
+            self.chosen
+                .lock()
+                .map_err(|_| anyhow!("fake Host location lock poisoned"))?
+                .remove(agent);
+            Ok(())
         }
 
         pub fn status(&self) -> HostStatus {
@@ -304,6 +396,36 @@ mod tests {
         let json = serde_json::to_value(state.devices().await.unwrap()).unwrap();
         assert_eq!(json[1]["last_seen"], serde_json::Value::Null);
         assert!(json[0].get("phone_key").is_none());
+    }
+
+    #[tokio::test]
+    async fn locations_are_checked_kept_and_forgotten() {
+        let state = HostState::start(HostConfig::default()).await.unwrap();
+        assert!(
+            state
+                .locations()
+                .await
+                .unwrap()
+                .iter()
+                .all(|l| l.program.is_none())
+        );
+        assert!(
+            state
+                .set_location("codex", r"D:\x\notes.txt")
+                .await
+                .is_err()
+        );
+        let checked = state
+            .set_location("codex", r"D:\x\codex.exe")
+            .await
+            .unwrap();
+        assert_eq!(checked.version.as_deref(), Some("1.0.0（演示）"));
+        let json = serde_json::to_value(state.locations().await.unwrap()).unwrap();
+        assert_eq!(json[0]["agent"], "codex");
+        assert_eq!(json[0]["program"], r"D:\x\codex.exe");
+        assert_eq!(json[1]["program"], serde_json::Value::Null);
+        state.clear_location("codex").await.unwrap();
+        assert!(state.locations().await.unwrap()[0].program.is_none());
     }
 
     #[tokio::test]

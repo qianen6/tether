@@ -206,6 +206,7 @@ fn dsh(id: &str, name: &str, command: Vec<String>) -> Arc<dyn AgentAdapter> {
         id: id.into(),
         name: name.into(),
         command,
+        auto: false,
     }))
 }
 
@@ -255,8 +256,9 @@ pub(crate) fn discover(custom: &[CustomAgent], echo: bool) -> Vec<Arc<dyn AgentA
             terminal: Some(command[..1].iter().map(|s| s.to_string()).collect()),
         }));
     }
-    let default_dsh = tether_adapter_dsh::DshAgent::default_agent();
-    list.push(dsh(&default_dsh.id, &default_dsh.name, default_dsh.command));
+    list.push(wrap(tether_adapter_dsh::adapter(
+        tether_adapter_dsh::DshAgent::default_agent(),
+    )));
     list.push(terminal_only("shell", "Shell", shell_command()));
     if echo {
         list.push(Arc::new(tether_agent_api::EchoAdapter));

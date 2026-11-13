@@ -35,11 +35,25 @@ pub(crate) fn rpc_code(error: &anyhow::Error) -> Option<&str> {
 }
 
 /// One `dsh web`, as the adapter needs it. Tests use a scripted fake.
+///
+/// Method names, payloads and answers are DSH 0.1's (`session.prompt`,
+/// `client-response` answers); the 0.2 client ([`crate::v2`]) maps them.
 pub(crate) trait Api: Send + Sync + 'static {
     /// The value of a successful call; `Value::Null` when there is none.
     fn call(&self, method: &str, payload: Value) -> BoxFuture<Value>;
     /// Answer a server request; `true` when DSH accepted the answer.
     fn respond(&self, message: Value) -> BoxFuture<bool>;
+    /// Start receiving `session`'s frames. In 0.1 reading a session attaches
+    /// it (a cold resume), after which its frames arrive on the mux.
+    fn attach(&self, session: &str) -> BoxFuture<()> {
+        let read = self.call(
+            "session.history",
+            serde_json::json!({ "sessionId": session, "maxMessages": 1 }),
+        );
+        Box::pin(async move { read.await.map(|_| ()) })
+    }
+    /// Stop receiving `session`'s frames (nothing to do in 0.1).
+    fn detach(&self, _session: &str) {}
 }
 
 pub(crate) fn request(method: &str, payload: Value) -> Value {
