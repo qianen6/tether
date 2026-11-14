@@ -10,10 +10,8 @@
 //! 1. the address filled in on the computer ([`set_saved_url`]), then
 //!    `TETHER_DSH_URL`: a `dsh web` the person runs, so the phone continues
 //!    the same conversations (0.2 needs the whole URL it printed);
-//! 2. the 0.1 `dsh web` Tether started last time (its address is kept in the
-//!    temp folder);
-//! 3. `http://127.0.0.1:3080`, where 0.1's `dsh web` listens by default;
-//! 4. otherwise Tether starts `dsh web --no-open --host 127.0.0.1 --port 0`
+//! 2. `http://127.0.0.1:3080`, where 0.1's `dsh web` listens by default;
+//! 3. otherwise Tether starts `dsh web --no-open --host 127.0.0.1 --port 0`
 //!    itself, with the person's own `DSH_HOME`, and keeps the URL it prints
 //!    (token included) in memory only.
 
@@ -45,7 +43,7 @@ use crate::{
 
 pub(crate) const URL_ENV: &str = "TETHER_DSH_URL";
 pub(crate) const DEFAULT_ORIGIN: &str = "http://127.0.0.1:3080";
-const STATE_FILE: &str = "tether-dsh-web.json";
+const OLD_STATE_FILE: &str = "tether-dsh-web.json";
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 /// The first boot of a profile installs nothing but may be slow.
 const LAUNCH_TIMEOUT: Duration = Duration::from_secs(120);
@@ -161,14 +159,11 @@ impl Hubs {
     }
 }
 
-fn state_file() -> PathBuf {
-    std::env::temp_dir().join(STATE_FILE)
-}
-
-fn saved_origin() -> Option<String> {
-    let text = std::fs::read_to_string(state_file()).ok()?;
-    let v: Value = serde_json::from_str(&text).ok()?;
-    v.get("origin")?.as_str().map(str::to_owned)
+/// Earlier versions kept the address of the `dsh web` they started in the
+/// temp folder. That one now ends with Tether, so the address is always
+/// stale: remove it rather than leave a wrong port lying around.
+fn forget_old_state() {
+    let _ = std::fs::remove_file(std::env::temp_dir().join(OLD_STATE_FILE));
 }
 
 /// DSH 0.1's `host.describe` at `origin`.
@@ -242,9 +237,6 @@ pub async fn check_url(input: &str) -> Result<String> {
 fn candidates() -> Vec<String> {
     let mut list = Vec::new();
     list.extend(given_url());
-    if let Some(saved) = saved_origin() {
-        list.push(saved);
-    }
     list.push(DEFAULT_ORIGIN.to_owned());
     list.dedup();
     list
@@ -276,6 +268,7 @@ async fn attach_url(url: &str, launched: Option<Launched>) -> Result<Hub> {
 }
 
 async fn connect(command: &[String]) -> Result<Hub> {
+    forget_old_state();
     let saved = saved_url();
     let strict = if saved.is_none() { env_url() } else { None };
     let mut hint = None;
@@ -315,9 +308,6 @@ async fn connect(command: &[String]) -> Result<Hub> {
             });
         }
     };
-    if let Some((origin, None)) = v2::split_url(&url) {
-        let _ = std::fs::write(state_file(), json!({ "origin": origin }).to_string());
-    }
     attach_url(&url, Some(launched)).await
 }
 

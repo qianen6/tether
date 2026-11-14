@@ -909,6 +909,7 @@ async fn providers_without_a_key() {
             model("scripted/scripted-1", false),
         ],
         &missing,
+        &[],
     )
     .unwrap();
     assert!(
@@ -923,6 +924,7 @@ async fn providers_without_a_key() {
     let error = crate::setup::usable(
         vec![model("deepseek-official/deepseek-v4-flash", true)],
         &missing,
+        &[],
     )
     .unwrap_err()
     .to_string();
@@ -931,7 +933,22 @@ async fn providers_without_a_key() {
         "{error}"
     );
     assert!(error.contains("在电脑上"));
-    assert!(crate::setup::usable(Vec::new(), &missing).is_err());
+    assert!(error.contains("web 配置"), "{error}");
+    // Nothing listed: DSH's own reasons are passed on (0.2 `failures`).
+    let failed = crate::setup::failures(&json!({
+        "groups": [],
+        "failures": [{ "id": "chatecnu", "name": "ChatECNU", "message": "no credential for provider route" }]
+    }));
+    assert_eq!(
+        failed,
+        vec!["ChatECNU：no credential for provider route".to_string()]
+    );
+    let error = crate::setup::usable(Vec::new(), &missing, &failed)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("还没有可用的模型"), "{error}");
+    assert!(error.contains("ChatECNU：no credential"), "{error}");
+    assert!(crate::setup::failures(&json!({ "groups": [] })).is_empty());
 }
 
 #[test]
