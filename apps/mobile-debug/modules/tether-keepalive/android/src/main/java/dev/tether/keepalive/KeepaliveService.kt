@@ -1,5 +1,6 @@
 package dev.tether.keepalive
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -31,7 +32,7 @@ class KeepaliveService : Service() {
     val notification: Notification = NotificationCompat.Builder(this, CHANNEL)
       .setContentTitle(title)
       .setContentText(text)
-      .setSmallIcon(applicationInfo.icon)
+      .setSmallIcon(smallIcon())
       .setOngoing(true)
       .setContentIntent(open)
       .build()
@@ -41,6 +42,16 @@ class KeepaliveService : Service() {
     ServiceCompat.startForeground(this, ID, notification, type)
     return START_NOT_STICKY
   }
+
+  /**
+   * The white status-bar icon expo-notifications makes from app.json
+   * (`notification_icon`); the app icon only if it is missing. Android draws a
+   * small icon by its alpha alone, so the full-colour app icon is a blank shape.
+   */
+  @SuppressLint("DiscouragedApi") // a resource another plugin generates, not one this module can name
+  private fun smallIcon(): Int =
+    resources.getIdentifier("notification_icon", "drawable", packageName).takeIf { it != 0 }
+      ?: applicationInfo.icon
 
   companion object {
     const val CHANNEL = "tether-keepalive"

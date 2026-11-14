@@ -14,7 +14,7 @@ import { entries, groups, hiddenSessions, matches, pairSessions, type Entry } fr
 import { sessionsOf, type Family, type FamilyKey } from "./agents";
 import { useAgentInfos } from "./context";
 import type { Opening } from "./ChatScreen";
-import { CircleButton, duration, Icon, Menu, ProgramIcon, programOf, shortPath, Spinner, StatusMark, T, type IconName } from "./kit";
+import { CircleButton, duration, Icon, Menu, ProgramIcon, programOf, shortPath, Spinner, StatusMark, T, TetherMark, type IconName } from "./kit";
 import { alpha, FONT, useTheme } from "./theme";
 
 const SHOWN = 5;
@@ -120,7 +120,7 @@ export function Sidebar(props: {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 18, paddingRight: 12, paddingTop: 10, paddingBottom: 8 }}>
         <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: t.primary, alignItems: "center", justifyContent: "center" }}>
-          <Icon name="sparkles" size={15} color={t.primaryForeground} />
+          <TetherMark size={17} color={t.primaryForeground} />
         </View>
         <T size={21} weight="700" style={{ flex: 1 }}>Tether</T>
         {loading ? <ActivityIndicator size="small" color={t.sidebarForeground} /> : null}

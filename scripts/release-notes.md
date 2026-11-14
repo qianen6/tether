@@ -1,4 +1,4 @@
-Tether {{VERSION}}：用手机通过加密隧道控制电脑上的编程 agent（Codex、Claude Code、DeepSeek Harness、ACP agent、终端）。开发预览版。
+Tether {{VERSION}}：用手机通过加密隧道控制电脑上的编程 agent（Codex、Claude Code、DeepSeek Harness、ACP agent、终端）。
 
 ## 电脑端：从源码安装
 
@@ -16,7 +16,7 @@ Tether {{VERSION}}：用手机通过加密隧道控制电脑上的编程 agent�
 | 文件 | 说明 |
 |---|---|
 | `tether-android.apk` | Android App。没有上架应用商店，安装时需要允许"安装未知应用"。 |
-| `Tether使用说明.pdf` | 17 页使用说明：安装、配对、审批、提醒、终端、出问题时怎么办。 |
+| `tether-guide-zh.pdf` | 17 页中文使用说明：安装、配对、审批、提醒、终端、出问题时怎么办。 |
 | `SHA256SUMS` | 以上文件的校验值。 |
 
 ## 出问题时

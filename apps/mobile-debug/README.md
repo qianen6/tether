@@ -33,3 +33,7 @@ pnpm --filter mobile-debug typecheck
 ```
 
 真机验收步骤见 `docs/tasks/T11-mobile-debug.md`。
+
+## 图标
+
+源文件是 `assets/icon.svg`（一根线连着手机和电脑，电脑那端的红点表示有事等你）。`icon.png`、`android-icon-*.png` 和通知栏用的 `notification-icon.png`（白色、透明底）都从它导出；App 里的 `TetherMark`（`src/kit.tsx`）画的是同一个标志。

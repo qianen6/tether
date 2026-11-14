@@ -58,6 +58,20 @@ export function Icon(props: { name: IconName; size?: number; color?: string }) {
   return <SvgXml xml={UI_ICONS[props.name]} width={props.size ?? 18} height={props.size ?? 18} color={props.color ?? t.mutedForeground} />;
 }
 
+/**
+ * Tether's mark, as on the app icon (assets/icon.svg): a line tying the phone (bottom left)
+ * to the computer (top right, red: something waits for you). `color` draws the line and
+ * the phone; the computer keeps the theme's needs-you red.
+ */
+export function TetherMark(props: { size?: number; color?: string }) {
+  const t = useTheme();
+  const xml =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="224 224 576 576">` +
+    `<path d="M338 668 C338 470 686 556 686 358" fill="none" stroke="currentColor" stroke-width="66" stroke-linecap="round"/>` +
+    `<circle cx="338" cy="668" r="84" fill="currentColor"/><circle cx="686" cy="358" r="84" fill="${t.chart2}"/></svg>`;
+  return <SvgXml xml={xml} width={props.size ?? 18} height={props.size ?? 18} color={props.color ?? t.foreground} />;
+}
+
 /** Which Herdr program icon a Tether agent id or command line gets. */
 export function programOf(agentOrCommand: string | string[] | undefined): string {
   const first = Array.isArray(agentOrCommand) ? agentOrCommand[0] ?? "" : agentOrCommand ?? "";

@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Tether 调试",
+    "name": "Tether",
     "slug": "tether-mobile-debug",
-    "version": "0.1.0",
+    "version": "0.1.2",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -13,7 +13,7 @@
     "android": {
       "package": "dev.tether.mobiledebug",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#111113",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -23,14 +23,16 @@
         "android.permission.POST_NOTIFICATIONS"
       ],
       "predictiveBackGestureEnabled": false,
-      "versionCode": 17
+      "versionCode": 18
     },
     "plugins": [
       "expo-secure-store",
       [
         "expo-notifications",
         {
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "icon": "./assets/notification-icon.png",
+          "color": "#111113"
         }
       ],
       [

@@ -19,7 +19,7 @@ import type { ProjectInfo } from "@tether/client";
 import { history } from "./src/files";
 import { families, familyOf, type Family, type FamilyKey } from "./src/agents";
 import { AgentsContext, PaneContext } from "./src/context";
-import { Button, CircleButton, Icon, T } from "./src/kit";
+import { Button, CircleButton, T, TetherMark } from "./src/kit";
 import { alpha, useTheme } from "./src/theme";
 
 type Main =
@@ -235,7 +235,7 @@ function Home({ onMenu }: { onMenu?: () => void }) {
       </View>
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 18, paddingHorizontal: 40, alignSelf: "center", width: "100%", maxWidth: 520 }}>
         <View style={{ width: 88, height: 88, borderRadius: 24, backgroundColor: t.primary, alignItems: "center", justifyContent: "center" }}>
-          <Icon name="terminal" size={40} color={t.primaryForeground} />
+          <TetherMark size={50} color={t.primaryForeground} />
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: t.border }}>
           {busy ? <ActivityIndicator size="small" color={t.chart1} /> : <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: open ? t.ok : t.chart4 }} />}
@@ -258,7 +258,7 @@ function PairScreen() {
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 32, paddingVertical: 40, gap: 14, width: "100%", maxWidth: 560, alignSelf: "center" }}>
       <View style={{ alignItems: "center", gap: 16, marginBottom: 8 }}>
         <View style={{ width: 88, height: 88, borderRadius: 24, backgroundColor: t.primary, alignItems: "center", justifyContent: "center" }}>
-          <Icon name="terminal" size={40} color={t.primaryForeground} />
+          <TetherMark size={50} color={t.primaryForeground} />
         </View>
         <T size={26} weight="600">连接你的电脑</T>
         <T size={14.5} color={t.mutedForeground} style={{ textAlign: "center", lineHeight: 21 }}>
