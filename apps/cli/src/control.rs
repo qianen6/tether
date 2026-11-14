@@ -36,9 +36,21 @@ struct Endpoint {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum Request {
-    Pair { minutes: u64 },
+    Pair {
+        minutes: u64,
+    },
     Devices,
-    Revoke { device_id: String },
+    Revoke {
+        device_id: String,
+    },
+    /// The agents, whether each can run, and the program chosen for it.
+    Agents,
+    /// Checks and keeps `path` as `agent`'s program (for DSH also the
+    /// address of a running `dsh web`); `None` forgets it.
+    Locate {
+        agent: String,
+        path: Option<String>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,6 +97,40 @@ impl Handler for Host {
                 self.revoke(&device_id).await?;
                 Ok(Value::Null)
             }
+            Request::Agents => {
+                let locations = self.locations();
+                let agents: Vec<Value> = self
+                    .agents()
+                    .into_iter()
+                    .map(|a| {
+                        let location = locations.iter().find(|l| l.agent == a.id);
+                        json!({
+                            "id": a.id,
+                            "name": a.name,
+                            "available": a.available,
+                            "detail": a.detail,
+                            "locatable": location.is_some(),
+                            "location": location
+                                .and_then(|l| l.program.as_ref())
+                                .map(|p| p.display().to_string()),
+                        })
+                    })
+                    .collect();
+                Ok(Value::Array(agents))
+            }
+            Request::Locate { agent, path } => match path {
+                Some(path) => {
+                    let checked = self.set_location(&agent, &path).await?;
+                    Ok(json!({
+                        "program": checked.program.display().to_string(),
+                        "version": checked.version,
+                    }))
+                }
+                None => {
+                    self.clear_location(&agent)?;
+                    Ok(Value::Null)
+                }
+            },
         }
     }
 }
@@ -225,6 +271,8 @@ mod tests {
                 Request::Devices => json!([]),
                 Request::Revoke { device_id } if device_id == "nope" => bail!("no device nope"),
                 Request::Revoke { .. } => Value::Null,
+                Request::Agents => json!([]),
+                Request::Locate { .. } => Value::Null,
             };
             Ok(reply)
         }

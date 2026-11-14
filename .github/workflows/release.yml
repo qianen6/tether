@@ -1,19 +1,18 @@
 name: release
 
-# A `v*` tag builds every installer and publishes them as a GitHub Release.
-# Run by hand (Actions → release → Run workflow) to only build them, as
-# downloadable artifacts of the run.
+# Run by hand (Actions → release → Run workflow): builds the desktop installers
+# and the command-line version as downloadable artifacts of the run. Nothing is
+# published: the computer side is installed from source (DEPLOY.md), and a
+# GitHub Release only carries the Android app, uploaded with `gh release create`.
 #
 # Optional settings (Settings → Secrets and variables → Actions):
 # - variable WINDOWS_SIGN_COMMAND: signs the Windows programs and installers,
 #   given to Tauri as `bundle.windows.signCommand` (`%1` is the file), e.g. a
 #   signtool call or a signing service's client.
 # - variables EXPO_OWNER and EAS_PROJECT_ID, secret EXPO_TOKEN: also build the
-#   Android app on EAS and attach it.
+#   Android app on EAS.
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -134,48 +133,3 @@ jobs:
           name: dist-android
           path: dist/*
           if-no-files-found: error
-
-  release:
-    needs: [desktop, android]
-    # The Android build is optional: skipped is fine, failed is not.
-    if: >-
-      !cancelled() && startsWith(github.ref, 'refs/tags/v')
-      && needs.desktop.result == 'success'
-      && (needs.android.result == 'success' || needs.android.result == 'skipped')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: dist-*
-          path: dist
-          merge-multiple: true
-      - name: Checksums and notes
-        env:
-          SIGNED: ${{ vars.WINDOWS_SIGN_COMMAND != '' }}
-        run: |
-          set -eu
-          (cd dist && sha256sum * > SHA256SUMS)
-          if [ "$SIGNED" = true ]; then
-            signing='Windows 版已签名。macOS 版未签名：第一次打开如果提示"无法验证开发者"，到"系统设置 → 隐私与安全性"里点"仍要打开"。'
-          else
-            signing='安装包还没有代码签名：
-          - Windows 弹出"Windows 已保护你的电脑"时，点"更多信息"→"仍要运行"。如果是"智能应用控制已阻止"，没有放行按钮，只能在"Windows 安全中心 → 应用和浏览器控制 → 智能应用控制"里关掉它后再装（较早的 Windows 11 版本关掉后要重置系统才能再打开）。
-          - macOS 提示"无法验证开发者"时，到"系统设置 → 隐私与安全性"里点"仍要打开"。
-          - 可以用 SHA256SUMS 核对下载的文件。'
-          fi
-          VERSION="${GITHUB_REF_NAME}" SIGNING="$signing" python3 - <<'EOF'
-          import os
-          text = open("scripts/release-notes.md", encoding="utf-8").read()
-          text = text.replace("{{VERSION}}", os.environ["VERSION"]).replace("{{SIGNING}}", os.environ["SIGNING"])
-          open("notes.md", "w", encoding="utf-8").write(text)
-          EOF
-      - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          pre=""
-          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" dist/* --title "Tether $GITHUB_REF_NAME" --notes-file notes.md $pre

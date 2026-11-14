@@ -103,19 +103,45 @@ pub(crate) fn not_set_up(missing: Option<&MissingKey>) -> String {
     };
     let env = missing.map(|m| m.env.as_str()).unwrap_or("对应的");
     format!(
-        "电脑上的 DSH 还不能用：{what}。请在电脑上配置模型后再来：在电脑上运行 `dsh web`，在网页的「模型」（Models）页填好 API Key；或者设置环境变量 {env} 后重新打开 Tether。"
+        "电脑上的 DSH 还不能用：{what}。请在电脑上配置模型后再来：在电脑上运行 `dsh web`，在网页的「模型」（Models）页填好 API Key；或者设置环境变量 {env} 后重新打开 Tether。{PROFILE_NOTE}"
     )
 }
 
+/// Tether runs `dsh web`; DSH 0.2 keeps the desktop app's models in its own
+/// `desktop` profile, which only the app may boot.
+const PROFILE_NOTE: &str = "注意：Tether 用的是 DSH 的 web 配置，和 DSH 桌面版的模型设置是分开的（桌面版的 desktop 配置只有桌面版自己能用），要在 `dsh web` 的网页里另外配置一次。";
+
+/// DSH's own reasons a provider listed no models (0.2's `failures` in
+/// `session/modelCatalog`: `[{id, name, message}]`), one line each.
+pub(crate) fn failures(catalog: &serde_json::Value) -> Vec<String> {
+    catalog
+        .get("failures")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|f| {
+            let message = str_at(f, &["message"])?;
+            let name = str_at(f, &["name"]).or_else(|| str_at(f, &["id"]))?;
+            let message: String = message.chars().take(200).collect();
+            Some(format!("{name}：{message}"))
+        })
+        .collect()
+}
+
 /// The models, with those whose provider lacks a key marked; an error when
-/// none can answer.
+/// none can answer. `failed` are DSH's reasons providers listed nothing.
 pub(crate) fn usable(
     mut models: Vec<ModelInfo>,
     missing: &HashMap<String, MissingKey>,
+    failed: &[String],
 ) -> anyhow::Result<Vec<ModelInfo>> {
     let provider_of = |m: &ModelInfo| m.id.split('/').next().unwrap_or_default().to_owned();
     if models.is_empty() {
-        anyhow::bail!(not_set_up(None));
+        let mut text = not_set_up(None);
+        if !failed.is_empty() {
+            text.push_str(&format!("\nDSH 读模型列表时出错：\n{}", failed.join("\n")));
+        }
+        anyhow::bail!(text);
     }
     if models.iter().all(|m| missing.contains_key(&provider_of(m))) {
         let current = models

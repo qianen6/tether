@@ -1,8 +1,8 @@
 //! `tether` — the computer side without a window.
 //!
-//! `serve` runs the host in the foreground; `pair`, `devices` and `revoke`
-//! talk to the running `serve` through a local control endpoint
-//! (`control.rs`).
+//! `serve` runs the host in the foreground; `pair`, `devices`, `revoke`,
+//! `agents` and `locate` talk to the running `serve` through a local control
+//! endpoint (`control.rs`).
 
 mod control;
 
@@ -54,6 +54,10 @@ enum Command {
         /// Print `{"qr":…,"expires_at":…}` instead of the QR code (scripts).
         #[arg(long)]
         json: bool,
+        /// Also open the QR code in the browser (for when this terminal is
+        /// not the one the person looks at, e.g. an AI agent's).
+        #[arg(long, conflicts_with = "json")]
+        open: bool,
     },
     /// List paired phones.
     Devices {
@@ -63,6 +67,24 @@ enum Command {
     },
     /// Remove a phone; it is disconnected at once.
     Revoke { device_id: String },
+    /// List the agents, whether each can run, and the program chosen for it.
+    Agents {
+        /// Print JSON instead of a table (scripts).
+        #[arg(long)]
+        json: bool,
+    },
+    /// Choose the program an agent uses (checked before it is kept). For
+    /// DSH this may also be the whole line a running `dsh web` printed.
+    Locate {
+        /// Agent id, as `tether agents` lists it.
+        agent: String,
+        /// The program, its folder, or (DSH) `http://127.0.0.1:PORT/?token=…`.
+        #[arg(required_unless_present = "clear", conflicts_with = "clear")]
+        path: Option<String>,
+        /// Forget the choice: Tether finds the program by itself again.
+        #[arg(long)]
+        clear: bool,
+    },
 }
 
 const LOG_FILE: &str = "tether.log";
@@ -185,24 +207,32 @@ async fn shutdown(host: Arc<tether_host::Host>) -> anyhow::Result<()> {
 
 async fn remote(data_dir: &Path, command: Command) -> anyhow::Result<()> {
     match command {
-        Command::Pair { minutes, json } => {
+        Command::Pair {
+            minutes,
+            json,
+            open,
+        } => {
             let data = control::call(data_dir, control::Request::Pair { minutes }).await?;
             if json {
                 println!("{data}");
                 return Ok(());
             }
             let qr = data["qr"].as_str().context("no QR code in reply")?;
+            let expires_at = data["expires_at"].as_u64().unwrap_or(0);
             println!("{}", qr_for_terminal(qr)?);
-            let left = data["expires_at"]
-                .as_u64()
-                .unwrap_or(0)
-                .saturating_sub(tether_proto::now_ms())
-                / 1000;
+            let left = expires_at.saturating_sub(tether_proto::now_ms()) / 1000;
             println!(
                 "用手机 App 扫描上面的二维码。{} 分 {} 秒内有效。",
                 left / 60,
                 left % 60
             );
+            if open {
+                let page = data_dir.join(PAIR_PAGE);
+                std::fs::write(&page, pair_page(qr, left)?)
+                    .with_context(|| format!("cannot write {}", page.display()))?;
+                open_in_browser(&page);
+                println!("二维码也已在浏览器里打开：{}", page.display());
+            }
         }
         Command::Devices { json } => {
             let data = control::call(data_dir, control::Request::Devices).await?;
@@ -239,6 +269,46 @@ async fn remote(data_dir: &Path, command: Command) -> anyhow::Result<()> {
             .await?;
             println!("已移除 {device_id}，它的连接已断开。");
         }
+        Command::Agents { json } => {
+            let data = control::call(data_dir, control::Request::Agents).await?;
+            if json {
+                println!("{data}");
+                return Ok(());
+            }
+            for a in data.as_array().cloned().unwrap_or_default() {
+                let state = if a["available"] == true {
+                    "可用".to_string()
+                } else {
+                    a["detail"].as_str().unwrap_or("不可用").to_string()
+                };
+                println!(
+                    "  {:<14} {:<18} {state}",
+                    a["id"].as_str().unwrap_or("?"),
+                    a["name"].as_str().unwrap_or("?"),
+                );
+                if let Some(location) = a["location"].as_str() {
+                    println!("  {:<14} 使用选择的位置：{location}", "");
+                }
+            }
+        }
+        Command::Locate { agent, path, .. } => {
+            let request = control::Request::Locate {
+                agent: agent.clone(),
+                path: path.clone(),
+            };
+            let data = control::call(data_dir, request).await?;
+            match path {
+                Some(_) => println!(
+                    "检查通过{}，{agent} 之后都用 {}",
+                    data["version"]
+                        .as_str()
+                        .map(|v| format!("（{v}）"))
+                        .unwrap_or_default(),
+                    data["program"].as_str().unwrap_or("?"),
+                ),
+                None => println!("已改回自动查找 {agent}。"),
+            }
+        }
         Command::Serve { .. } => unreachable!("handled by main"),
     }
     Ok(())
@@ -255,6 +325,47 @@ fn ago(ms: &Value) -> String {
         60..3600 => format!("{} 分钟前", s / 60),
         3600..86400 => format!("{} 小时前", s / 3600),
         _ => format!("{} 天前", s / 86400),
+    }
+}
+
+/// The pairing page `pair --open` writes into the data directory.
+const PAIR_PAGE: &str = "pair.html";
+
+/// A page showing the pairing QR code, for the browser.
+fn pair_page(qr: &str, seconds_left: u64) -> anyhow::Result<String> {
+    use qrcode::render::svg;
+    let code = qrcode::QrCode::new(qr.as_bytes())?;
+    let image = code
+        .render::<svg::Color<'_>>()
+        .min_dimensions(320, 320)
+        .quiet_zone(true)
+        .build();
+    Ok(format!(
+        r#"<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>Tether 配对</title>
+<style>body{{font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;margin-top:48px;color:#222}}</style>
+</head><body>
+<h1>用手机 App 扫描配对</h1>
+{image}
+<p>二维码 {} 分钟内有效，只能配对一台手机。过期后在电脑上重新运行 <code>tether pair --open</code>。</p>
+</body></html>
+"#,
+        seconds_left.div_ceil(60)
+    ))
+}
+
+/// Opens `path` with the default program; failing to is not an error (the
+/// terminal shows the code too).
+fn open_in_browser(path: &Path) {
+    let program = if cfg!(windows) {
+        "explorer"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    if let Err(error) = std::process::Command::new(program).arg(path).spawn() {
+        tracing::warn!(%error, "cannot open {}", path.display());
     }
 }
 
@@ -278,9 +389,43 @@ mod tests {
             c.command,
             Command::Pair {
                 minutes: 5,
-                json: false
+                json: false,
+                open: false
             }
         ));
+    }
+
+    #[test]
+    fn locate_needs_a_path_or_clear() {
+        let c = Cli::parse_from([
+            "tether",
+            "locate",
+            "dsh",
+            "dsh web: http://127.0.0.1:1/?token=x",
+        ]);
+        assert!(matches!(
+            c.command,
+            Command::Locate { ref agent, path: Some(_), clear: false } if agent == "dsh"
+        ));
+        let c = Cli::parse_from(["tether", "locate", "dsh", "--clear"]);
+        assert!(matches!(
+            c.command,
+            Command::Locate {
+                path: None,
+                clear: true,
+                ..
+            }
+        ));
+        assert!(Cli::try_parse_from(["tether", "locate", "dsh"]).is_err());
+        assert!(Cli::try_parse_from(["tether", "locate", "dsh", "x", "--clear"]).is_err());
+    }
+
+    #[test]
+    fn pair_page_has_the_code() {
+        let page = pair_page("tether1:abc", 125).unwrap();
+        assert!(page.contains("<svg"));
+        assert!(page.contains("3 分钟内有效"));
+        assert!(Cli::try_parse_from(["tether", "pair", "--open", "--json"]).is_err());
     }
 
     #[test]

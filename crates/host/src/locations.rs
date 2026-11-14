@@ -423,8 +423,9 @@ impl AgentAdapter for Located {
                 info.available = there;
                 info.detail = (!there).then(|| {
                     format!(
-                        "填写的位置 {} 已经不存在了：请在电脑端 Tether 的 Agent 里重新选择",
-                        program.display()
+                        "填写的位置 {} 已经不存在了：请在电脑上重新选择（Tether 窗口的 Agent 列表，或运行 tether locate {} <位置>）",
+                        program.display(),
+                        self.id
                     )
                 });
                 let program = program.display().to_string();
@@ -436,7 +437,8 @@ impl AgentAdapter for Located {
             None if !info.available && self.kind != Kind::Dsh => {
                 let why = info.detail.take().unwrap_or_else(|| "未找到".into());
                 info.detail = Some(format!(
-                    "{why}。如果已经装了，可以在电脑端 Tether 的 Agent 里选择它的位置"
+                    "{why}。如果已经装了，可以在电脑上选择它的位置（Tether 窗口的 Agent 列表，或运行 tether locate {} <位置>）",
+                    self.id
                 ));
             }
             None => {}
@@ -523,12 +525,14 @@ mod tests {
             chat: true,
             terminal_command: command.iter().map(|s| s.to_string()).collect(),
         };
+        // A path as this system writes it: `\` only separates folders on Windows.
+        let desktop = if cfg!(windows) {
+            r"C:\Apps\Codex.EXE"
+        } else {
+            "/Applications/Codex.app/Contents/Resources/Codex"
+        };
         assert_eq!(
-            kind_of(&info(
-                "codex-desktop",
-                AgentKind::Codex,
-                &[r"C:\Apps\Codex.EXE"]
-            )),
+            kind_of(&info("codex-desktop", AgentKind::Codex, &[desktop])),
             Some(program_kind("codex"))
         );
         assert_eq!(

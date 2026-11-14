@@ -1,5 +1,7 @@
 # AGENTS.md — 给 Codex 的项目规则
 
+> **如果你是来帮用户在这台电脑上安装 Tether 的，不要按本文件改代码，照 [`DEPLOY.md`](DEPLOY.md) 做。** 本文件是开发任务的规则。
+
 本仓库是 **Tether**（临时名）：手机通过加密隧道控制电脑上的编程 agent（Codex、Claude Code、ACP agent、任意终端程序）。
 每个 Codex 会话只执行 `docs/tasks/` 中的**一个**任务文件。开始前按顺序阅读：
 

@@ -133,7 +133,7 @@ impl DshAdapter {
             );
         }
         format!(
-            "未找到 DSH（命令 {}）：PATH 和常见安装目录里都没有。在电脑端 Tether 的 Agent 里填写 dsh.cmd 的位置，或设置环境变量 {COMMAND_ENV} 为它的完整路径",
+            "未找到 DSH（命令 {}）：PATH 和常见安装目录里都没有。在电脑上填写 dsh.cmd 的位置（Tether 窗口的 Agent 列表，或运行 tether locate dsh <位置>），或设置环境变量 {COMMAND_ENV} 为它的完整路径",
             self.program()
         )
     }
@@ -212,14 +212,16 @@ impl AgentAdapter for DshAdapter {
                 .call("host.describe", json!({}))
                 .await
                 .unwrap_or(Value::Null);
-            let models = models_from(&api.call("llm.models", json!({})).await?, &current);
+            let catalog = api.call("llm.models", json!({})).await?;
+            let failed = setup::failures(&catalog);
+            let models = models_from(&catalog, &current);
             let mut providers: Vec<String> = models
                 .iter()
                 .filter_map(|m| m.id.split_once('/').map(|(p, _)| p.to_owned()))
                 .collect();
             providers.dedup();
             let missing = setup::missing_keys(api.as_ref(), &providers).await;
-            setup::usable(models, &missing)
+            setup::usable(models, &missing, &failed)
         })
     }
 
