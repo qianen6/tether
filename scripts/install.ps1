@@ -167,7 +167,7 @@ Invoke-Native { & $Exe @DataArgs agents }
 if (-not $NoPair) {
   Step '配对手机'
   Invoke-Native { & $Exe @DataArgs pair --open }
-  if ($LASTEXITCODE -ne 0) { Write-Warning '配对二维码没有打开，稍后运行 targetelease	ether.exe pair --open' }
+  if ($LASTEXITCODE -ne 0) { Write-Warning '配对二维码没有打开，稍后运行 target\release\tether.exe pair --open' }
 }
 
 Write-Host ''

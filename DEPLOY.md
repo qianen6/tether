@@ -13,7 +13,7 @@ Tether 让手机控制这台电脑上的编程 agent（Codex、Claude Code、Dee
 2. **不要注册成 Windows 服务 / 系统级服务，也不要用管理员身份运行 tether。** 它必须以用户自己的身份运行，
    才能读到用户的 Codex、Claude、DSH 的登录信息和配置。安装脚本用的是"登录时运行"（Windows 计划任务、
    macOS launchd 用户代理、Linux systemd 用户服务），照用即可。
-3. **安装 Rust 或 C++ 编译工具之前先问用户。** Windows 上的 C++ 工具有几个 GB。
+3. **安装 Git、Rust 或 C++ 编译工具之前先问用户。** Windows 上的 C++ 工具有几个 GB。
 4. **不要关闭任何安全功能**（Windows 智能应用控制、Defender、SmartScreen、macOS Gatekeeper）。被拦就停下来告诉用户，见"常见问题"。
 5. 隧道程序 `tailpocket-host` 由安装脚本下载，并用仓库里提交的 `vendor/tailpocket/SHA256SUMS` 核对。
    校验不通过时脚本会停下，**不要绕过校验**。
@@ -28,6 +28,9 @@ cd tether
 ```
 
 已经有源码就 `git pull`。放在一个长期保留的目录里：运行的就是这个目录里编译出来的程序，删了就不能用了。
+
+没有 `git` 就先装（先问用户）：Windows `winget install --id Git.Git -e`（装完新开一个终端）；macOS 运行
+`xcode-select --install`，会连同 C 编译器一起装上；Linux `sudo apt install git`。
 
 ### 2. 准备编译工具（缺什么装什么，装之前先问用户）
 

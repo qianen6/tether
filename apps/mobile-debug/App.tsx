@@ -267,9 +267,11 @@ function PairScreen() {
       </View>
       <View style={{ gap: 8, borderRadius: 18, backgroundColor: t.muted, padding: 16 }}>
         <T size={13} weight="500">在电脑上</T>
-        <T size={13} color={t.mutedForeground}>从开始菜单打开 Tether，窗口里会显示配对二维码；或在终端里运行：</T>
-        <T size={12.5} mono selectable>tether serve</T>
-        <T size={12.5} mono selectable>tether pair</T>
+        <T size={13} color={t.mutedForeground}>
+          按 Tether 源码里的 DEPLOY.md 装好后，浏览器会打开配对二维码。二维码过期了，在源码目录里运行：
+        </T>
+        <T size={12.5} mono selectable>target/release/tether pair --open</T>
+        <T size={12} color={t.sidebarForeground}>Windows 是 target\release\tether.exe</T>
       </View>
       <Button label={busy ? "正在建立隧道并配对…" : "扫码配对"} disabled={busy} onPress={() => void link.pair()} style={{ marginTop: 8, borderRadius: 18 }} />
       {busy ? <ActivityIndicator color={t.mutedForeground} /> : null}
