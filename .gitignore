@@ -10,3 +10,22 @@ dist/
 .env
 .DS_Store
 apps/desktop/src-tauri/gen/
+
+# Local credentials, personal runtime state and working material.
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+auth.json
+credentials.json
+tunnel-state.json
+control.json
+desktop-settings.json
+*.log
+/.claude/
+/参考/

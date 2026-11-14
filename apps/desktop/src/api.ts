@@ -27,6 +27,19 @@ export interface HostStatus {
   fake_host: boolean;
 }
 
+/** An agent whose program can be chosen, and the chosen one (null: Tether finds it). */
+export interface AgentLocation {
+  agent: string;
+  program: string | null;
+}
+
+/** A chosen program that passed its check. */
+export interface ProgramCheck {
+  program: string;
+  /** What `--version` printed; shells are not asked. */
+  version: string | null;
+}
+
 export interface DesktopApi {
   pair(): Promise<PairInfo>;
   currentPair(): Promise<PairInfo | null>;
@@ -38,6 +51,12 @@ export interface DesktopApi {
   setKeepAwake(enabled: boolean): Promise<boolean>;
   autostart(): Promise<boolean>;
   setAutostart(enabled: boolean): Promise<boolean>;
+  /** Agents whose program can be chosen, with the program chosen for each. */
+  locations(): Promise<AgentLocation[]>;
+  /** Checks the program at `path` (a file or its folder) for `agent` and keeps it; rejects with why not. */
+  setLocation(agent: string, path: string): Promise<ProgramCheck>;
+  /** Forgets `agent`'s chosen program: Tether finds it by itself again. */
+  clearLocation(agent: string): Promise<void>;
   onPairing(handler: (pair: PairInfo) => void): Promise<UnlistenFn>;
   onError(handler: (message: string) => void): Promise<UnlistenFn>;
 }
@@ -56,6 +75,9 @@ export const desktopApi: DesktopApi = {
     await (enabled ? enable() : disable());
     return isEnabled();
   },
+  locations: () => invoke("locations"),
+  setLocation: (agent, path) => invoke("set_location", { agent, path }),
+  clearLocation: (agent) => invoke("clear_location", { agent }),
   onPairing: (handler) => listen<PairInfo>("desktop:pairing", (event) => handler(event.payload)),
   onError: (handler) => listen<string>("desktop:error", (event) => handler(event.payload)),
 };

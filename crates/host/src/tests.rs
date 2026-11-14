@@ -252,6 +252,81 @@ async fn agents_toml_is_read() {
     host.shutdown().await.unwrap();
 }
 
+#[tokio::test]
+async fn every_agent_can_be_pointed_at_its_program() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join(config::AGENTS_FILE),
+        "[[agent]]\nid = \"mine\"\nname = \"Mine\"\ncommand = [\"tether-missing-xyz\"]\nmode = \"acp\"\n",
+    )
+    .unwrap();
+    let host = start(dir.path(), None).await;
+    let listed: Vec<String> = host.locations().into_iter().map(|l| l.agent).collect();
+    assert!(listed.contains(&"mine".to_string()), "{listed:?}");
+    assert!(listed.contains(&"dsh".to_string()), "{listed:?}");
+    assert!(!listed.contains(&"echo".to_string()), "{listed:?}");
+
+    // A program with the right name that answers `--version`.
+    let bin = tempfile::tempdir().unwrap();
+    let program = if cfg!(windows) {
+        let p = bin.path().join("tether-missing-xyz.cmd");
+        std::fs::write(&p, "@echo off\r\necho mine 1.2.3\r\n").unwrap();
+        p
+    } else {
+        let p = bin.path().join("tether-missing-xyz");
+        std::fs::write(&p, "#!/bin/sh\necho mine 1.2.3\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        p
+    };
+    let wrong = bin.path().join("other.cmd");
+    std::fs::write(&wrong, "").unwrap();
+    assert!(
+        host.set_location("mine", &wrong.display().to_string())
+            .await
+            .is_err()
+    );
+    let checked = host
+        .set_location("mine", &bin.path().display().to_string())
+        .await
+        .unwrap();
+    assert_eq!(checked.program, program);
+    assert_eq!(checked.version.as_deref(), Some("mine 1.2.3"));
+    let mine = host.agents().into_iter().find(|a| a.id == "mine").unwrap();
+    assert!(mine.available, "{mine:?}");
+    assert_eq!(mine.terminal_command[0], program.display().to_string());
+    let kept = host
+        .locations()
+        .into_iter()
+        .find(|l| l.agent == "mine")
+        .unwrap();
+    assert_eq!(kept.program.as_deref(), Some(program.as_path()));
+    host.shutdown().await.unwrap();
+
+    // Kept across restarts, and forgotten on request.
+    let host = start(dir.path(), None).await;
+    assert!(
+        host.agents()
+            .into_iter()
+            .find(|a| a.id == "mine")
+            .unwrap()
+            .available
+    );
+    host.clear_location("mine").unwrap();
+    assert!(
+        !host
+            .agents()
+            .into_iter()
+            .find(|a| a.id == "mine")
+            .unwrap()
+            .available
+    );
+    host.shutdown().await.unwrap();
+}
+
 #[test]
 fn data_dir_and_name() {
     let dir = default_data_dir();

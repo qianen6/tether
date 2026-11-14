@@ -22,7 +22,7 @@ DSH 跑在一次性的 `DSH_HOME` 里，模型换成本地脚本（OpenAI 兼容
 
 ## 协议要点（0.1.x）
 
-- 没有令牌和 cookie：`/api` 只认回环地址的 `Host`。0.2 起改成令牌换 cookie、方法名 `session/prompt`，这里没有实现。
+- 没有令牌和 cookie：`/api` 只认回环地址的 `Host`。0.2 的协议见下面一节。
 - 一元调用：`POST /api/<method>`，`{type:"client-request", rpcId, method, payload}` → `{type:"server-response", rpcId, result:{ok, value|error}}`。
   插件提供的方法（`commands/execute`、`commands/list`）同样走这里，`payload` 为 `{args:{…}}`。
 - 两条只下行的 WebSocket：`events.mux` 推所有已接上会话的帧（`session/event`、`approval/*`、`question/*`、`session/queue`、`session/projection`），
@@ -33,3 +33,31 @@ DSH 跑在一次性的 `DSH_HOME` 里，模型换成本地脚本（OpenAI 兼容
 - 问题：同样用帧的 `rpcId`，`value = {sessionId, answer:{answers:[{id, selected:[选项文字], custom?}]}}`；取消用 `result:{ok:false, error:{code:"cancelled"}}`。
 - 权限只能通过命令切换：`commands/execute` 执行 `/permission <read-only|workspace-write|danger-full-access>`。
   直接把 `/permission …` 当消息发给 `session.prompt` 不会执行命令，只会成为一条普通消息。
+
+## 0.2（`v2/`）
+
+`v2/conversation.jsonl`：2026-11-12 用 npm 上的 `@deepseek-ai/dsh` 0.2 录制，同样是一次性的 `DSH_HOME` 加本地脚本模型。
+内容：新会话里的普通回复、PowerShell 命令、越出沙箱的审批（先拒绝、再允许一次）、`ask_user_question` 和回答、执行中取消，
+以及 `session/selectModel`、`session/list`、`session/events`、`commands/list`、`commands/execute` 等调用。
+路径同样换成了 `C:\work\demo`、`C:\Users\me`，去掉了系统提示和运行时上下文消息，不含 token 与 cookie。
+
+每行 `{"dir", "v"}`：`req`/`res` 是一元调用的请求和回复；`open`/`close` 是发上 `/api/remote.mux` 的 `open`/`cancel`；
+`mux` 是 `/api/remote.mux` 下行的 `item`/`end`/`error`。
+
+协议要点：
+
+- 鉴权：`dsh web` 打印 `http://127.0.0.1:端口/?token=…`。token 每次启动随机生成，只在这个进程里有效，DSH 也不把它写进任何文件。
+  `GET /connect?token=…&interactions=answer` 回 302 和 `dsh-auth-…` cookie，之后的请求和 WebSocket 都要带这个 cookie，没有就是 401。
+- 一元调用：`POST /api/<命名空间>/<方法>`，`payload` 是 `{args:{<参数名>: …}}`，例如 `session/create` 是 `{request:{cwd}}`，
+  `session/list` 是 `{_request:{}}`。错误码改为 `session/not-found` 这种写法。
+- 下行全在一条 WebSocket `/api/remote.mux` 上，按 `streamId` 分流：
+  - `$events`（参数 `{}`）：先来 `ready{clientId}`；`waterfall` 是要人回答的事（`approval/request`、`user-questions/request`），
+    用 `POST /api/$events/result` 回答，参数 `{clientId, eventId, outcome}`，`outcome` 为 `{kind:"result", value}`、`{kind:"next"}`
+    或 `{kind:"rejected", error}`；`emit` 是主机通知（`api-session/added|removed|status|error`）；`cancel` 表示别处已经答了。
+  - `session/follow`（参数 `{request:{address:{kind:"session", sessionId}, activate:true, assistantStream:true}}`）：先来 `snapshot`，
+    然后是 `event`（和 0.1 相同的会话事件，多了 `approval/asked`、`approval/decided`）和 `assistant-stream`（流式文字）。
+- 审批回答的值是 `"allowed-once"`、`"rejected"` 等字符串；问题是 `{answers:[{id, selected, custom?}]}`。
+- 工具结果的 `isError` 和文字直接在 `message` 上（0.1 在 `message.result` 里）。
+
+适配器的做法：`src/v2.rs` 把 0.1 的调用名翻译成 0.2 的端点和参数、把结果整理回 0.1 的形状，再把 `remote.mux` 的帧转成 0.1 的帧；
+会话逻辑（`session.rs`、`translate.rs`）两个版本共用。

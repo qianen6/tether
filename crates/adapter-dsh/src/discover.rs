@@ -17,6 +17,11 @@ fn launcher_names() -> &'static [&'static str] {
     }
 }
 
+/// Whether a file name (lower case) is DSH's launcher.
+pub(crate) fn is_launcher_name(name: &str) -> bool {
+    launcher_names().contains(&name)
+}
+
 /// The launcher directly in `dir`, if any.
 fn launcher_in(dir: &Path) -> Option<PathBuf> {
     launcher_names()
@@ -27,8 +32,8 @@ fn launcher_in(dir: &Path) -> Option<PathBuf> {
 
 /// `root/dsh*` or `root/<child>/dsh*` (`root/<child>/bin/dsh` on Unix).
 /// Backups are skipped; among several children the newest launcher wins.
-fn launcher_under(root: &Path) -> Option<PathBuf> {
-    if let Some(found) = launcher_in(root) {
+pub(crate) fn launcher_under(root: &Path) -> Option<PathBuf> {
+    if let Some(found) = launcher_in(root).or_else(|| launcher_in(&root.join("bin"))) {
         return Some(found);
     }
     let mut found: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(root)

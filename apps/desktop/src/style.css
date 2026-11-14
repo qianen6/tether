@@ -89,3 +89,10 @@ button.danger.solid:hover:not(:disabled) { background: var(--danger); opacity: 0
 
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch input, .switch input::after { transition: none; } }
+
+/* Where an agent's program is: chosen under its row. */
+.locate { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.locate form { display: flex; flex-direction: column; gap: 6px; }
+.locate input { font: inherit; font-size: 13px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--fg); background: var(--fill); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; width: 100%; }
+.locate input:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+.locate .found { color: var(--ok); font-size: 12.5px; }

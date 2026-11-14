@@ -22,3 +22,8 @@ Herdr Anywhere — https://github.com/jt-wang/herdr-anywhere
   - UI and program icons from the Herdr desktop app (https://github.com/herdrdev/herdr-app),
     Apache License 2.0.
   - Geist and JetBrains Mono fonts, SIL Open Font License 1.1.
+
+Accompanying license texts are in LICENSES/ (Boop, Herdr Anywhere,
+TailPocket, and the Herdr desktop app). Font license texts are preserved
+in apps/mobile-debug/assets/herdr/fonts/. Third-party materials retain
+their original licenses; the project's MIT license does not replace them.
